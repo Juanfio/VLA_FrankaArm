@@ -1,0 +1,36 @@
+{
+    "data_name_lst": [
+        "stanford_hydra_dataset_converted_externally_to_rlds",
+        "taco_play"
+    ],    
+    "n_episodes": 16,
+    "path_data": "./data",
+    
+    "oxe_dataset_name": "stanford_hydra_taco_play",
+    "data_name_sim": "sim_demos.hdf5",
+
+    "keys_to_keep": {
+        "stanford_hydra_dataset_converted_externally_to_rlds": [
+            "actions",
+            "image",
+            "language_instruction",
+            "episode_idx",
+            "dataset_name"
+        ]
+    },
+
+    "renaming_keys": {},
+    "model_parameters":{
+        "img_size": 224,
+        "patch_size": 16,
+        "in_channels": 3,
+        "embed_dim": 192,
+        "num_layers": 3,
+        "num_heads": 3,
+        "mlp_dim": 512,
+        "dropout": 0.1
+    },
+
+    "learning_rate" : 1e-4
+        
+}

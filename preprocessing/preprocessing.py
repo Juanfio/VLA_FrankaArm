@@ -15,11 +15,31 @@ LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-Min
 #################################################
 ################# Open dataset ##################
 #################################################
-def open_combined_dataset(path_data: str, oxe_dataset_name: str):
+def open_combined_dataset(path_data: str, oxe_dataset_name: str, data_name_lst: list = None):
+    """
+    Load a combined dataset from HDF5 file.
+
+    Args:
+        path_data: Path to the data directory.
+        oxe_dataset_name: Name of the combined HDF5 file (without .h5 extension).
+        data_name_lst: Optional list of dataset names to include. If None,
+            all datasets in the HDF5 file are loaded.
+
+    Returns:
+        data: List of sample dicts.
+        metadata: Dict mapping dataset_name -> metadata dict.
+    """
     data = []
     metadata = {}
     with h5py.File(f"{path_data}/{oxe_dataset_name}.h5", "r") as f:
-        for data_name in f.keys(): # access a single dataset.
+        # Filter datasets if data_name_lst is provided
+        dataset_names_to_load = data_name_lst if data_name_lst is not None else f.keys()
+
+        for data_name in dataset_names_to_load: # access a single dataset.
+            if data_name not in f.keys():
+                print(f"Warning: Dataset '{data_name}' not found in HDF5 file. Skipping.")
+                continue
+
             total_samples = 0
             data_grp = f[data_name]
             metadata[data_name] = {"actions_metadata": json.loads(data_grp.attrs["actions_metadata"])}
@@ -330,23 +350,20 @@ def make_weights(subset, metadata):
   List of weights with length equal to subset length.
   Individual datasets stored within subset are not sorted.
   Loop over subset and save the weight associated with the
-  corresponding dataset.  
+  corresponding dataset.
+
+  Weights are computed as 1/n_samples per dataset, scaled by a factor
+  to make weights more interpretable.
   '''
 
   scaling_factor = 150 # to make weights not too small.
 
-  n_samples_hydra = metadata['stanford_hydra_dataset_converted_externally_to_rlds']["total_samples"]
-  n_taco_play = metadata['taco_play']["total_samples"]
+  # Compute weight for each dataset dynamically based on total samples
+  dataset_weight = {}
+  for data_name, meta in metadata.items():
+    n_samples = meta["total_samples"]
+    dataset_weight[data_name] = 1/n_samples * scaling_factor
 
-  w_hydra = 1/n_samples_hydra * scaling_factor
-  w_taco  = 1/n_taco_play * scaling_factor
-
-  # per-dataset weight, indexed by dataset_name
-  dataset_weight = {
-      "stanford_hydra_dataset_converted_externally_to_rlds": w_hydra,
-      "taco_play": w_taco,
-  }
-  
   return [dataset_weight[subset.dataset[i]["dataset_name"]] for i in subset.indices]
 
 def worker_init_fn(worker_id):
@@ -355,20 +372,24 @@ def worker_init_fn(worker_id):
     torch.set_num_threads(1)
 
 
-def get_dataloaders_oxe(cfg: str = "cfg.json", 
+def get_dataloaders_oxe(cfg: str = "cfg.json",
                         n_bins: int = N_BINS,
                         keys_to_keep: dict = None,
                         renaming_keys: dict = None,
-                        batch_size: int = 32):
+                        batch_size: int = 32,
+                        data_name_lst: list = None):
 
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
 
-    data_name_lst = settings["data_name_lst"] # characteristics: Franka, Single Arm, EEF Position.
     oxe_dataset_name = settings["oxe_dataset_name"]
     path_data = settings["path_data"]
 
+    # If data_name_lst not provided, use the one from config
+    if data_name_lst is None:
+        data_name_lst = settings.get("data_name_lst", None)
+
     ############## open data
-    data, metadata = open_combined_dataset(path_data, oxe_dataset_name)
+    data, metadata = open_combined_dataset(path_data, oxe_dataset_name, data_name_lst)
     ############## discretize data
     data_discretized, action_percentiles = apply_discretization(data, metadata, N_BINS)
     

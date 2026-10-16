@@ -25,9 +25,9 @@ def get_model(parameters: dict):
     ) # embed_dim=768, num_layers=12, num_heads=12, mlp_dim=3072
 
     action_heads = {
-        "stanford_hydra_dataset_converted_externally_to_rlds": ActionHead(embed_dim=192, action_dim=6),
-        "taco_play": ActionHead(embed_dim=192, action_dim=6),
-        "simulated": ActionHead(embed_dim=192, action_dim=3), # in simulated environment the action is just the movement of end-effector position (i.e., no rotation).
+        "stanford_hydra_dataset_converted_externally_to_rlds": ActionHead(embed_dim=192, action_dim=6)
+        # "taco_play": ActionHead(embed_dim=192, action_dim=6),
+        # "simulated": ActionHead(embed_dim=192, action_dim=3), # in simulated environment the action is just the movement of end-effector position (i.e., no rotation).
     }
 
     model = RoboticActionModel(vit, action_heads)
@@ -139,7 +139,7 @@ def train(
     device,
     num_epochs: int = 20,
     lr: float = 1e-4,
-    checkpoint_path: str = str(Path(__file__).resolve().parent.parent / 'data/best_model.pt'),
+    checkpoint_path: str = str(Path(__file__).resolve().parent.parent / 'data/best_model_stanford_hydra.pt'),
 ):  
     parent_directory = str(Path(__file__).resolve().parent.parent)
     model.to(device)
@@ -168,8 +168,8 @@ def train(
         print(f"Resuming training from epoch {start_epoch}")
     
     # update already available metrics_epoch dictionary
-    if Path(parent_directory + '/data/metrics_epoch.pt').is_file():
-        with h5py.File(parent_directory + '/data/metrics_epoch.pt', "r") as f:
+    if Path(parent_directory + '/data/metrics_epoch_stanford_hydra.pt').is_file():
+        with h5py.File(parent_directory + '/data/metrics_epoch_stanford_hydra.pt', "r") as f:
             metrics_epoch = {key: f[key][()] for key in f}
 
     for epoch in range(start_epoch, num_epochs + 1):
@@ -199,9 +199,9 @@ def train(
                 },
                 checkpoint_path,
             )
-            print(f"  -> saved new best checkpoint (val_loss={val_loss:.4f})")
+            print(f" -> saved new best checkpoint (val_loss={val_loss:.4f})")
 
-    with h5py.File(parent_directory + '/data/metrics_epoch.pt', "w") as f:
+    with h5py.File(parent_directory + '/data/metrics_epoch_stanford_hydra.pt', "w") as f:
         for key, value in metrics_epoch.items():
             f.create_dataset(key, data=value)
 
@@ -233,7 +233,8 @@ if __name__ == "__main__":
         n_bins=N_BINS,
         keys_to_keep=keys_to_keep,
         renaming_keys=renaming_keys,
-        batch_size=BATCH_SIZE
+        batch_size=BATCH_SIZE,
+        data_name_lst=["stanford_hydra_dataset_converted_externally_to_rlds"]
         )
         
     parameters = settings["model_parameters"]

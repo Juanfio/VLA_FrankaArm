@@ -17,7 +17,6 @@
             "episode_idx",
             "dataset_name"
         ],
-
         "taco_play": [
             "rel_actions_world",
             "rgb_static",
@@ -55,6 +54,6 @@
         "dropout": 0.1
     },
 
-    "learning_rate" : 5e-4
+    "learning_rate" : 1e-4
         
 }
