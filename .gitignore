@@ -6,4 +6,13 @@ notes.md
 /project_2-vla_openx_embodiment.md
 /project_3-openvla_pretrained.md
 /preprocessing/language_models
+<<<<<<< Updated upstream
 /.claude
+=======
+/.claude
+/preprocessing/__pycache__
+/simulation/__pycache__
+/postprocessing/__pycache__
+/notebooks/__pycache__
+/scripts
+>>>>>>> Stashed changes
