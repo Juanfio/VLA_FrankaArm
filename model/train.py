@@ -222,10 +222,7 @@ if __name__ == "__main__":
     settings = get_settings(settings=
                                   str(Path(__file__).resolve().parent.parent / f"{args.settings}"))    
     
-    # data_name_lst = settings["data_name_lst"] # characteristics: Franka, Single Arm, EEF Position.
-    # n_episodes = settings["n_episodes"]
-    # output_name = settings["output_name"]
-
+    data_name_lst = settings["data_name_lst"]
     keys_to_keep = settings["keys_to_keep"]
     renaming_keys = settings["renaming_keys"]
     train_loader, val_loader, lang_dim = get_dataloaders_oxe(
@@ -234,7 +231,7 @@ if __name__ == "__main__":
         keys_to_keep=keys_to_keep,
         renaming_keys=renaming_keys,
         batch_size=BATCH_SIZE,
-        data_name_lst=["stanford_hydra_dataset_converted_externally_to_rlds"]
+        data_name_lst=data_name_lst
         )
         
     parameters = settings["model_parameters"]

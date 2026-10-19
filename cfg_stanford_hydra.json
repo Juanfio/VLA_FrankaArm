@@ -1,7 +1,6 @@
 {
     "data_name_lst": [
-        "stanford_hydra_dataset_converted_externally_to_rlds",
-        "taco_play"
+        "stanford_hydra_dataset_converted_externally_to_rlds"
     ],    
     "n_episodes": 16,
     "path_data": "./data",
