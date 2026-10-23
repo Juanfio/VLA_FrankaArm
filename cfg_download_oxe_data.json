@@ -1,0 +1,11 @@
+{
+    "data_name_lst": [
+        "stanford_hydra_dataset_converted_externally_to_rlds",
+        "taco_play"
+    ],    
+    "n_episodes": 40,
+    "path_data": "./data",
+    
+    "oxe_dataset_name": "stanford_hydra_taco_play_40-episodes",
+    "data_name_sim": "sim_demos.hdf5"       
+}

@@ -18,9 +18,15 @@ Vision-Language-Action Model (VLA) trained on Open X Embodiment (OxE) data for m
 
 `Select datasets via cfg.json`
 
-`python download_oxe_data.py --settings cfg.json`
+```
+conda activate oxe_download
+python -m preprocessing.download_oxe_data --settings cfg_download_oxe_data.json
+```
 
-`python -m model.train --settings cfg.json --n_epochs 5`
+```
+conda activate robotic
+python -m model.train --settings cfg.json --n_epochs 5
+```
 
 <!-- SOMETHING ABOUT PRINTING PLOTS -->
 

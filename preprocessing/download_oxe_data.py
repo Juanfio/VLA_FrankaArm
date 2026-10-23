@@ -12,10 +12,7 @@ import argparse
 
 import tensorflow_datasets as tfds
 import tensorflow as tf
-from utils import get_settings
-
-
-
+from .utils import get_settings
 
 def feature_to_metadata(feature):
     # Extract feature metadata from the builder.
@@ -70,7 +67,7 @@ def open_dataset(builder_dir: str, n_episodes: int, verbose=True):
     )
 
     print(
-        f"Data size on disk: "
+        f"Entire data size on disk: "
         f"{builder.info.dataset_size / 1e9:.2f} GB"
     )
 
@@ -88,8 +85,8 @@ def _get_candidate_keys(dimension: str):
 #### save data slice as hdf5
 
 # transform into hdf5 format. Useful for uploading with an environment without tensorflow.
-def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, output_name: str):
-    with h5py.File(f"{path_data}/{output_name}.h5", "w") as f:
+def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, oxe_dataset_name: str):
+    with h5py.File(f"{path_data}/{oxe_dataset_name}.h5", "w") as f:
         for data_name in data_name_lst:
             print("\n\n====================================================")
             print(f"Dataset: {data_name}")
@@ -136,7 +133,7 @@ def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, outp
             dataset_grp.attrs["actions_metadata"] = json.dumps(action_metadata)
     
     # Print data size
-    file_path = Path(f"{path_data}/{output_name}.h5")
+    file_path = Path(f"{path_data}/{oxe_dataset_name}.h5")
     size_bytes = file_path.stat().st_size
     print(f"Size of file {file_path}: {size_bytes / (1024 ** 2):.2f} MB")
     print(f"Size of file {file_path}: {size_bytes / (1024 ** 3):.2f} GB")
@@ -154,9 +151,9 @@ if __name__ == "__main__":
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{args.settings}"))    
     data_name_lst = settings["data_name_lst"] # characteristics: Franka, Single Arm, EEF Position.
     n_episodes = settings["n_episodes"]
-    output_name = settings["output_name"]
+    oxe_dataset_name = settings["oxe_dataset_name"]
 
     save_hdf5_dataset(path_data=str(Path(__file__).resolve().parent.parent / "data"), 
                     data_name_lst=data_name_lst,
                     n_episodes=n_episodes,
-                    output_name=output_name)
+                    oxe_dataset_name=oxe_dataset_name)
