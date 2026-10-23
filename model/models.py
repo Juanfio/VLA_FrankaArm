@@ -66,7 +66,7 @@ class TransformerEncoderBlock(nn.Module):
 
 class VisionTransformer(nn.Module):
     """
-    Full ViT encoder: patchify -> [class] token + positional embedding ->
+    Pure ViT encoder: patchify -> [class] token + positional embedding ->
     L transformer encoder blocks -> final LayerNorm -> image representation y.
 
     Follows Eq. 1-4:
@@ -74,14 +74,14 @@ class VisionTransformer(nn.Module):
         z'_l = MSA(LN(z_{l-1})) + z_{l-1},  l = 1..L
         z_l  = MLP(LN(z'_l)) + z'_l,        l = 1..L
         y    = LN(z_L^0)                     <- state of [class] token, final layer
-    
+
     References:
         AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE - Dosovitskiy
     """
 
     def __init__(
         self,
-        img_size: int = 224, 
+        img_size: int = 224,
         patch_size: int = 16,
         in_channels: int = 3,
         embed_dim: int = 768, # Table 1 in Dosovitsky et al 2021, arXiv. Hidden size D, output of CNN.
@@ -89,12 +89,15 @@ class VisionTransformer(nn.Module):
         num_heads: int = 12, # Table 1 in Dosovitsky et al 2021, arXiv.
         mlp_dim: int = 3072,
         dropout: float = 0.0,
+        use_lang: bool = False,
         lang_dim: int = 384
     ):
         super().__init__()
 
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
-        num_patches = self.patch_embed.num_patches
+        self.num_patches = self.patch_embed.num_patches
+        self.use_lang = use_lang
+        self.embed_dim = embed_dim
 
         # learnable [class] token, prepended to the patch sequence (Section 3.1)
         self.class_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -102,7 +105,7 @@ class VisionTransformer(nn.Module):
         # standard learnable 1D position embeddings (paper found 2D-aware embeddings
         # gave no significant improvement, Appendix D.4) -- one per position,
         # including the [class] token position (hence num_patches + 1)
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + 1, embed_dim))
 
         self.dropout = nn.Dropout(dropout)
 
@@ -113,19 +116,20 @@ class VisionTransformer(nn.Module):
 
         self.final_norm = nn.LayerNorm(embed_dim)  # Eq. 4: y = LN(z_L^0)
 
-
-        ## language embedding
-        self.lang_proj = nn.Linear(lang_dim, embed_dim)
-        self.lang_type_embed = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        # Language projection (only for vision-language mode)
+        if use_lang:
+            self.lang_proj = nn.Linear(lang_dim, embed_dim)
+            nn.init.trunc_normal_(self.lang_proj.weight, std=0.02)
+            nn.init.zeros_(self.lang_proj.bias)
 
         # fill a learnable parameter with small random values, drawn from a truncated normal distribution, before training starts.
         nn.init.trunc_normal_(self.class_token, std=0.02)
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        nn.init.trunc_normal_(self.lang_type_embed, std=0.02)
 
-    def forward(self, x: torch.Tensor, lang: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
         """
         x: (B, 3, H, W) -- a batch of preprocessed images.
+        lang: (B, lang_dim) -- language embeddings (optional, only when use_lang=True).
         Returns: (B, D) -- the [class] token's final representation, y.
         """
         B = x.shape[0]
@@ -135,8 +139,10 @@ class VisionTransformer(nn.Module):
         class_tokens = self.class_token.expand(B, -1, -1)     # (B, 1, D)
         x = torch.cat([class_tokens, x], dim=1) + self.pos_embed # (B, N+1, D)
 
-        lang_tok = self.lang_proj(lang).unsqueeze(1) + self.lang_type_embed
-        x = torch.cat([x, lang_tok], dim=1)                                  # add positional info
+        if self.use_lang and lang is not None:
+            lang_tok = self.lang_proj(lang).unsqueeze(1)       # (B, 1, D)
+            x = torch.cat([x, lang_tok], dim=1)                # (B, N+2, D)
+
         x = self.dropout(x)
 
         for block in self.encoder_blocks:
@@ -153,25 +159,39 @@ class ActionHead(nn.Module):
     vector. Given actions are already discretized to [0, 255] bins per
     dimension (from earlier preprocessing), this predicts per-dimension
     logits over 256 classes -- i.e. classification, not regression.
+
+    Supports vision-only and vision-language fusion via concatenation.
     """
 
-    def __init__(self, embed_dim: int, action_dim: int, n_bins: int = 32, hidden_dim: int = 512):
+    def __init__(self, embed_dim: int, action_dim: int, n_bins: int = 32, hidden_dim: int = 512,
+                 use_lang: bool = False, lang_dim: int = 384):
         super().__init__()
         self.action_dim = action_dim
         self.n_bins = n_bins
+        self.use_lang = use_lang
+
+        # Input dimension: vision + (language if enabled)
+        input_dim = embed_dim + (lang_dim if use_lang else 0)
 
         self.mlp = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
+            nn.Linear(input_dim, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, action_dim * n_bins), # the output dimension matches that of the action space.
         )
-        # print(f'ActionHead linear in features: {nn.Linear(embed_dim, hidden_dim).in_features}')
-        # print(f'ActionHead linear out features: {nn.Linear(embed_dim, hidden_dim).out_features}')
+        # print(f'ActionHead linear in features: {nn.Linear(input_dim, hidden_dim).in_features}')
+        # print(f'ActionHead linear out features: {nn.Linear(input_dim, hidden_dim).out_features}')
 
-    def forward(self, y: torch.Tensor) -> torch.Tensor:
-        # y: (B, D) -> (B, action_dim, n_bins) logits, one softmax per action dim
+    def forward(self, y: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
+        # y: (B, D_vision) -> (B, action_dim, n_bins) logits, one softmax per action dim
         B = y.shape[0]
-        out = self.mlp(y)
+
+        # Concatenate language embedding if enabled
+        if self.use_lang and lang is not None:
+            x = torch.cat([y, lang], dim=-1)  # (B, D_vision + D_lang)
+        else:
+            x = y
+
+        out = self.mlp(x)
         return out.view(B, self.action_dim, self.n_bins) # for a given action dimension, the probability of having a specific bin (from 0 - 255).
 
 
@@ -179,16 +199,29 @@ class RoboticActionModel(nn.Module):
     """
     ViT image encoder + action head.
     One ActionHead per dataset. Action space differ per dataset.
+
+    Supports:
+    - Pure vision model: ViT encodes images only
+    - Vision-language model: ViT encodes images + language tokens, fusion via concatenation
     """
 
     def __init__(self, vit: VisionTransformer, action_heads: dict[str, ActionHead]):
         super().__init__()
         self.vit = vit
+
+        # Validate action_heads match vit's use_lang setting
+        for name, head in action_heads.items():
+            if head.use_lang != self.vit.use_lang:
+                raise ValueError(
+                    f"ActionHead '{name}' use_lang={head.use_lang} does not match "
+                    f"ViT use_lang={self.vit.use_lang}. All action heads must match ViT mode."
+                )
+
         for name, child in self.vit.named_children():
-            print(f"Name: {name} \nChild: {child}")
             print("=====================")
+            print(f"Name: {name} \nChild: {child}")
         self.action_heads = nn.ModuleDict(action_heads)
 
     def forward(self, images: torch.Tensor, lang: torch.Tensor, dataset_name: str) -> torch.Tensor:
         y = self.vit(images, lang)                          # (B, D) shared image encoder
-        return self.action_heads[dataset_name](y)      # (B, action_dim, n_bins)
+        return self.action_heads[dataset_name](y, lang)     # (B, action_dim, n_bins)

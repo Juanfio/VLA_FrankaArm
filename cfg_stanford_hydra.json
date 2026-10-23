@@ -5,7 +5,7 @@
     "n_episodes": 16,
     "path_data": "./data",
     
-    "oxe_dataset_name": "stanford_hydra_taco_play",
+    "oxe_dataset_name": "stanford_hydra_taco_play_16-episodes",
     "data_name_sim": "sim_demos.hdf5",
 
     "keys_to_keep": {
@@ -27,9 +27,10 @@
         "num_layers": 3,
         "num_heads": 3,
         "mlp_dim": 512,
-        "dropout": 0.1
+        "dropout": 0.1,
+        "use_lang": false
     },
 
-    "learning_rate" : 1e-4
-        
+    "learning_rate" : 1e-4,
+    "model_filename": "stanford_hydra-16_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim"
 }

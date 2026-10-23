@@ -51,7 +51,8 @@
         "num_layers": 3,
         "num_heads": 3,
         "mlp_dim": 512,
-        "dropout": 0.1
+        "dropout": 0.1,
+        "use_lang": false
     },
 
     "learning_rate" : 1e-4

@@ -15,17 +15,40 @@ BATCH_SIZE=32
 #################################################
 def get_model(parameters: dict):
     #TODO: RENAME THIS FUNCTION. YOU ARE NOT GETTING THE MODEL YOU ARE DEFINING IT BASED ON SOME PARAMETERS.
- 
+    """
+    Get or define the model based on parameters.
+
+    Args:
+        parameters: dict containing model configuration:
+            - img_size, patch_size, in_channels, embed_dim, num_layers, num_heads, mlp_dim, dropout
+            - use_lang: bool (optional, default False) - whether to use language embeddings
+            - lang_dim: int (optional, default 384) - language embedding dimension
+
+    Returns:
+        RoboticActionModel: The defined model
+    """
+    # Extract parameters with defaults for optional ones
+    use_lang = parameters.get("use_lang", False)
+    lang_dim = parameters.get("lang_dim", 384) if use_lang else 0
+
     vit = VisionTransformer(
         img_size=parameters["img_size"], patch_size=parameters["patch_size"],
         in_channels=parameters["in_channels"], embed_dim=parameters["embed_dim"],
         num_layers=parameters["num_layers"], num_heads=parameters["num_heads"],
-        mlp_dim=parameters["mlp_dim"], dropout=parameters["dropout"], 
-        lang_dim=parameters["lang_dim"],
-    ) # embed_dim=768, num_layers=12, num_heads=12, mlp_dim=3072
+        mlp_dim=parameters["mlp_dim"], dropout=parameters["dropout"],
+        use_lang=use_lang, lang_dim=lang_dim,
+    )
+
+    # Determine action_head embed_dim based on whether language is used
+    # For vision-only: embed_dim = vit.embed_dim
+    # For vision-language (concat): embed_dim = vit.embed_dim + lang_dim
+    action_head_embed_dim = parameters["embed_dim"] + lang_dim if use_lang else parameters["embed_dim"]
 
     action_heads = {
-        "stanford_hydra_dataset_converted_externally_to_rlds": ActionHead(embed_dim=192, action_dim=6)
+        "stanford_hydra_dataset_converted_externally_to_rlds": ActionHead(
+            embed_dim=action_head_embed_dim, action_dim=6,
+            use_lang=use_lang, lang_dim=lang_dim
+        )
         # "taco_play": ActionHead(embed_dim=192, action_dim=6),
         # "simulated": ActionHead(embed_dim=192, action_dim=3), # in simulated environment the action is just the movement of end-effector position (i.e., no rotation).
     }
@@ -75,13 +98,25 @@ def run_one_epoch(model, loader, device, optimizer=None):
 
     total_loss, total_acc, total_samples = 0.0, 0.0, 0
 
+    # Check if model is in vision-only mode (no language)
+    vit = model.vit
+    use_lang = getattr(vit, 'use_lang', False)
+
     with torch.set_grad_enabled(is_train):
         for batch in loader:
             if is_train:
                 optimizer.zero_grad()
 
             images = batch["image"].to(device)
-            language = batch["language_embedding"].to(device)    
+
+            if use_lang:
+                language = batch["language_embedding"].to(device)
+            else:
+                # Create dummy language tensor - shape doesn't matter since it's unused
+                # But we need a valid tensor to pass through the model
+                batch_size = images.shape[0]
+                language = torch.zeros(batch_size, 1, device=device)
+
             targets = batch["actions"].to(device).long()
             dataset_names = batch["dataset_name"]  # list[str], length B
 
@@ -93,7 +128,9 @@ def run_one_epoch(model, loader, device, optimizer=None):
                 mask = torch.tensor([n == dataset_name for n in dataset_names], device=device)
                 idx = mask.nonzero(as_tuple=True)[0]
 
-                sub_images, sub_lang, sub_targets = images[idx], language[idx], targets[idx]
+                sub_images = images[idx]
+                sub_lang = language[idx]  # works for both use_lang=True/False
+                sub_targets = targets[idx]
 
                 logits = model(sub_images, sub_lang, dataset_name=dataset_name)
                 loss = action_ce_loss(logits, sub_targets)
@@ -137,10 +174,10 @@ def train(
     train_loader,
     val_loader,
     device,
+    model_filename: str,
     num_epochs: int = 20,
     lr: float = 1e-4,
-    checkpoint_path: str = str(Path(__file__).resolve().parent.parent / 'data/best_model_stanford_hydra.pt'),
-):  
+):
     parent_directory = str(Path(__file__).resolve().parent.parent)
     model.to(device)
     optimizer = build_optimizer(model, lr)
@@ -156,7 +193,7 @@ def train(
     start_epoch = 0
     
     # start from checkpoint if available.
-    checkpoint_path = Path(checkpoint_path)
+    checkpoint_path = Path(parent_directory + f'/data/best_model_{model_filename}.pt')
     if checkpoint_path.is_file():
         checkpoint = torch.load(checkpoint_path, map_location=device)
 
@@ -168,8 +205,8 @@ def train(
         print(f"Resuming training from epoch {start_epoch}")
     
     # update already available metrics_epoch dictionary
-    if Path(parent_directory + '/data/metrics_epoch_stanford_hydra.pt').is_file():
-        with h5py.File(parent_directory + '/data/metrics_epoch_stanford_hydra.pt', "r") as f:
+    if Path(parent_directory + f'/data/metrics_epoch_{model_filename}.pt').is_file():
+        with h5py.File(parent_directory + f'/data/metrics_epoch_{model_filename}.pt', "r") as f:
             metrics_epoch = {key: f[key][()] for key in f}
 
     for epoch in range(start_epoch, num_epochs + 1):
@@ -236,17 +273,33 @@ if __name__ == "__main__":
         
     parameters = settings["model_parameters"]
     parameters["lang_dim"] = lang_dim
+
+    # Add use_lang parameter (default False for vision-only mode)
+    # Set to True to enable vision-language model
+    parameters["use_lang"] = parameters.get("use_lang", False)
+
+    if parameters["use_lang"]:
+        print("=====================")
+        print("Vision-Language Model")
+        print("=====================")
+    else:
+        print("=====================")
+        print("Vision-only Model")
+        print("=====================")
+
     model = get_model(parameters)
     # torch.set_num_threads(12)
     # print(f"threads set to: {torch.get_num_threads()}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_epochs=args.n_epochs
     lr=settings["learning_rate"]
+    model_filename=settings["model_filename"]
     model, metrics_epoch = train(
                             model=model,
                             train_loader=train_loader,
                             val_loader=val_loader,
                             device=device,
+                            model_filename=model_filename,
                             num_epochs=num_epochs,
                             lr=lr,
                         )

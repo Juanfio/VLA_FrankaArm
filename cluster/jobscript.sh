@@ -4,11 +4,11 @@
 ##SBATCH --qos=7d # SCC: --qos=7d, CIDBN: comment it.
 #SBATCH -t 24:00:00 # SCC: 7-00, CIDBN: 14-00, 48:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=12 # SCC: 96, CIDBN: 128
+#SBATCH --ntasks-per-node=128 # SCC: 96, CIDBN: 128
 #SBATCH -A cidbn_wibral_neuro_human ## scc_users // cidbn_legacy
 #SBATCH -p cidbn ## medium // cidbn.
-#SBATCH --output=stanford_hydra-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.out #/dev/null
-#SBATCH --error=stanford_hydra-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.err #/dev/null
+#SBATCH --output=stanford_hydra-16_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.out #/dev/null
+#SBATCH --error=stanford_hydra-16_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.err #/dev/null
 
 ##SBATCH --mem=480G # 500G
 
