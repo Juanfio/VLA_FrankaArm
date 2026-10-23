@@ -11,4 +11,5 @@ notes.md
 /simulation/__pycache__
 /postprocessing/__pycache__
 /notebooks/__pycache__
+/model/__pycache__
 /scripts
