@@ -2,10 +2,9 @@
     "data_name_lst": [
         "stanford_hydra_dataset_converted_externally_to_rlds"
     ],    
-    "n_episodes": 16,
     "path_data": "./data",
     
-    "oxe_dataset_name": "stanford_hydra_taco_play_16-episodes",
+    "oxe_dataset_name": "stanford_hydra_taco_play_40-episodes",
     "data_name_sim": "sim_demos.hdf5",
 
     "keys_to_keep": {
@@ -32,5 +31,5 @@
     },
 
     "learning_rate" : 1e-4,
-    "model_filename": "stanford_hydra-16_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim"
+    "model_filename": "stanford_hydra-40_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim"
 }

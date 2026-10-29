@@ -1,0 +1,42 @@
+[2026-10-26 16:38:36,824] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121087 closing signal SIGTERM
+[2026-10-26 16:38:36,832] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121088 closing signal SIGTERM
+[2026-10-26 16:38:36,833] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121089 closing signal SIGTERM
+[2026-10-26 16:38:36,833] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121090 closing signal SIGTERM
+[2026-10-26 16:38:36,833] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121091 closing signal SIGTERM
+[2026-10-26 16:38:36,833] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121092 closing signal SIGTERM
+[2026-10-26 16:38:36,833] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121094 closing signal SIGTERM
+[2026-10-26 16:38:36,834] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121095 closing signal SIGTERM
+[2026-10-26 16:38:36,835] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121096 closing signal SIGTERM
+[2026-10-26 16:38:36,835] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121097 closing signal SIGTERM
+[2026-10-26 16:38:36,835] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 1121098 closing signal SIGTERM
+[2026-10-26 16:38:36,961] torch.distributed.elastic.multiprocessing.api: [ERROR] failed (exitcode: -9) local_rank: 6 (pid: 1121093) of binary: /mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Traceback (most recent call last):
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/torchrun", line 33, in <module>
+    sys.exit(load_entry_point('torch==2.2.2', 'console_scripts', 'torchrun')())
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 347, in wrapper
+    return f(*args, **kwargs)
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/lib/python3.10/site-packages/torch/distributed/run.py", line 812, in main
+    run(args)
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/lib/python3.10/site-packages/torch/distributed/run.py", line 803, in run
+    elastic_launch(
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 135, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 268, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+========================================================
+model.train FAILED
+--------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+--------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-10-26_16:38:36
+  host      : dbn11.usr.hpc.gwdg.de
+  rank      : 6 (local_rank: 6)
+  exitcode  : -9 (pid: 1121093)
+  error_file: <N/A>
+  traceback : Signal 9 (SIGKILL) received by PID 1121093
+========================================================
+[2026-10-26T16:38:45.948] error: Detected 1 oom_kill event in StepId=16866104.batch. Some of the step tasks have been OOM Killed.

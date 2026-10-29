@@ -1,4 +1,5 @@
 import torch
+import torch.multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader, random_split, Subset, WeightedRandomSampler
 from torchvision import transforms
 import torchvision.transforms.functional as TF
@@ -74,6 +75,126 @@ def open_combined_dataset(path_data: str, oxe_dataset_name: str, data_name_lst: 
             metadata[data_name]["language_keys"] = list(grp_language.keys())
             metadata[data_name]["total_samples"] = total_samples
     return data, metadata
+
+
+def preprocess_dataset_rank0(path_data: str, oxe_dataset_name: str, data_name_lst: list,
+                              keys_to_keep: dict, renaming_keys: dict, n_bins: int = N_BINS):
+    """
+    Preprocess dataset on rank 0 only, then share via shared memory.
+
+    This function performs all expensive preprocessing (loading, discretization,
+    image resizing, language embeddings) once, then returns the data in a format
+    suitable for shared memory sharing across DDP ranks.
+
+    Returns:
+        data: List of preprocessed sample dicts with shared memory tensors
+        metadata: Dict mapping dataset_name -> metadata dict
+        action_percentiles: Dict of action percentiles per dataset
+        lang_dim: Dimension of language embeddings
+    """
+    data, metadata = open_combined_dataset(path_data, oxe_dataset_name, data_name_lst)
+    data_discretized, action_percentiles = apply_discretization(data, metadata, n_bins)
+    data_filtered = filter_keys(data_discretized, keys_to_keep, renaming_keys)
+    data_filtered = image_resizing(data_filtered)
+    data_filtered, lang_dim, _ = add_language_embeddings(data_filtered)
+
+    return data_filtered, metadata, action_percentiles, lang_dim
+
+
+def build_shared_memory_dataset(data, metadata):
+    """
+    Convert a preprocessed dataset into shared memory tensors for DDP.
+
+    Args:
+        data: List of preprocessed sample dicts
+        metadata: Dataset metadata
+
+    Returns:
+        shared_data: Dict containing shared memory tensors:
+            - images: (N, 3, H, W) float32 tensor in shared memory
+            - actions: (N, action_dim) int64 tensor in shared memory
+            - language_embeddings: (N, lang_dim) float32 tensor in shared memory
+            - dataset_ids: (N,) int64 tensor in shared memory
+            - episode_indices: (N,) int64 tensor in shared memory
+            - index_to_sample: dict mapping global index to (dataset_idx, sample_idx)
+        metadata: Original metadata
+        action_percentiles: Action percentiles (loaded from saved file)
+        lang_dim: Language embedding dimension
+    """
+    from collections import defaultdict
+    import tempfile
+
+    N = len(data)
+
+    # Get dimensions
+    sample = data[0]
+    img_shape = sample['image'].shape  # (3, H, W)
+    action_dim = sample['actions'].shape[0] if sample['actions'].ndim > 0 else 1
+    lang_dim = sample['language_embedding'].shape[0]
+
+    # Create dataset name to id mapping
+    dataset_names = list(metadata.keys())
+    dataset_name_to_id = {name: i for i, name in enumerate(dataset_names)}
+
+    # Create shared memory tensors
+    # Note: We need to store these in a location accessible to all processes
+    # For now, use a temporary directory that can be accessed by all ranks
+
+    # Create tensors that will hold the data
+    images = torch.empty((N,) + img_shape, dtype=torch.float32)
+    actions = torch.empty((N, action_dim), dtype=torch.int64)
+    language_embeddings = torch.empty((N, lang_dim), dtype=torch.float32)
+    dataset_ids = torch.empty((N,), dtype=torch.int64)
+    episode_indices = torch.empty((N,), dtype=torch.int64)
+
+    # Fill tensors
+    for i, sample in enumerate(data):
+        images[i] = sample['image']
+        actions[i] = torch.from_numpy(sample['actions'])
+        language_embeddings[i] = sample['language_embedding']
+        dataset_ids[i] = dataset_name_to_id[sample['dataset_name']]
+        episode_indices[i] = sample['episode_idx']
+
+    # Put tensors in shared memory
+    images.share_memory_()
+    actions.share_memory_()
+    language_embeddings.share_memory_()
+    dataset_ids.share_memory_()
+    episode_indices.share_memory_()
+
+    # Create index mapping
+    index_to_sample = {}
+    dataset_sample_counts = defaultdict(int)
+    for i, sample in enumerate(data):
+        ds_name = sample['dataset_name']
+        ep_idx = sample['episode_idx']
+        sample_in_ep = dataset_sample_counts[(ds_name, ep_idx)]
+        index_to_sample[i] = {
+            'dataset_name': ds_name,
+            'dataset_id': dataset_name_to_id[ds_name],
+            'episode_idx': ep_idx,
+            'sample_in_episode': sample_in_ep
+        }
+        dataset_sample_counts[(ds_name, ep_idx)] += 1
+
+    return {
+        'images': images,
+        'actions': actions,
+        'language_embeddings': language_embeddings,
+        'dataset_ids': dataset_ids,
+        'episode_indices': episode_indices,
+        'index_to_sample': index_to_sample,
+        'dataset_names': dataset_names,
+        'dataset_name_to_id': dataset_name_to_id
+    }, metadata, action_percentiles, lang_dim
+
+
+def get_shared_dataset_path(shared_data_dir: str = None):
+    """Get path for shared dataset storage."""
+    if shared_data_dir is None:
+        import tempfile
+        return tempfile.mkdtemp(prefix='shared_dataset_')
+    return shared_data_dir
 
 #################################################
 ######### Discretize action space ###############
@@ -317,7 +438,7 @@ def add_language_embeddings(data,
 #################################################
 ############### Build Data Loaders ##############
 #################################################
-def split_by_episode(dataset: list[dict], val_frac: float = 0.1, seed: int = 42):
+def split_by_episode(dataset: list[dict] | SharedMemoryRobotDataset, val_frac: float = 0.1, seed: int = 42):
     '''
     - For each sample, get its (dataset_name, episode_idx) pair, since episode_idx
       alone is not globally unique (it resets to 0 for each dataset_name).
@@ -327,7 +448,20 @@ def split_by_episode(dataset: list[dict], val_frac: float = 0.1, seed: int = 42)
     - Episodes appearing in training set must not appear in validation set.
     '''
 
-    episode_to_indices = episode_to_ids(dataset)
+    # Handle both regular list[dict] and SharedMemoryRobotDataset
+    if isinstance(dataset, SharedMemoryRobotDataset):
+        # For shared memory dataset, use the index_to_sample mapping
+        episode_to_indices: dict[tuple[str, int], list[int]] = {}
+        for i in range(len(dataset.images)):
+            sample_info = dataset.index_to_sample[i]
+            key = (sample_info['dataset_name'], sample_info['episode_idx'])
+            episode_to_indices.setdefault(key, []).append(i)
+        all_indices = list(range(len(dataset.images)))
+    else:
+        # Original behavior for list[dict]
+        episode_to_indices = episode_to_ids(dataset)
+        all_indices = list(range(len(dataset)))
+
     episode_ids = sorted(episode_to_indices.keys())  # sorted list of (dataset_name, episode_idx) tuples
 
     rng = np.random.default_rng(seed)
@@ -337,13 +471,12 @@ def split_by_episode(dataset: list[dict], val_frac: float = 0.1, seed: int = 42)
     n_val_ep = max(1, int(val_frac * len(episode_ids)))
     train_episodes = set(episode_ids[n_val_ep:]) # keys of episode_to_indices going to training data.
     val_episodes = set(episode_ids[:n_val_ep])
-    
 
     # sample indices, i.e., indices of dataset[idx]
     train_indices = [i for ep in train_episodes for i in episode_to_indices[ep]]
     val_indices   = [i for ep in val_episodes   for i in episode_to_indices[ep]]
 
-    return Subset(dataset, train_indices), Subset(dataset, val_indices)
+    return train_indices, val_indices  # Return indices only, let caller build subsets
 
 def make_weights(subset, metadata):
   '''
@@ -372,12 +505,152 @@ def worker_init_fn(worker_id):
     torch.set_num_threads(1)
 
 
+class SharedMemoryRobotDataset(Dataset):
+    """
+    Dataset backed by shared memory tensors for DDP.
+
+    Created by rank 0 during preprocessing, then shared with all ranks.
+    Each rank can access the same underlying tensor storage without copying.
+    """
+
+    def __init__(self, shared_data: dict, indices: list = None):
+        """
+        Args:
+            shared_data: Dict containing shared memory tensors from build_shared_memory_dataset
+            indices: Optional list of indices to include (for train/val split)
+        """
+        self.images = shared_data['images']
+        self.actions = shared_data['actions']
+        self.language_embeddings = shared_data['language_embeddings']
+        self.dataset_ids = shared_data['dataset_ids']
+        self.episode_indices = shared_data['episode_indices']
+        self.index_to_sample = shared_data['index_to_sample']
+        self.dataset_names = shared_data['dataset_names']
+        self.dataset_name_to_id = shared_data['dataset_name_to_id']
+
+        self.indices = indices if indices is not None else list(range(len(self.images)))
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        # Map global index to actual data
+        actual_idx = self.indices[idx]
+        sample_info = self.index_to_sample[actual_idx]
+
+        return {
+            'image': self.images[actual_idx],
+            'actions': self.actions[actual_idx],
+            'language_embedding': self.language_embeddings[actual_idx],
+            'dataset_id': self.dataset_ids[actual_idx],
+            'episode_idx': self.episode_indices[actual_idx],
+            'dataset_name': self.dataset_names[self.dataset_ids[actual_idx].item()],
+        }
+
+
+class DistributedWeightedSampler:
+    """
+    Distributed sampler with weighted sampling.
+
+    Each rank gets a different weighted random sample of the data,
+    ensuring no overlap between ranks while respecting the weighting.
+
+    Args:
+        weights: List of weights for each sample in the full dataset
+        num_samples: Total number of samples to draw per epoch (per rank)
+        num_replicas: Number of DDP replicas
+        rank: Current replica rank
+        replacement: Whether to sample with replacement
+        seed: Random seed for reproducibility
+        shuffle: Whether to shuffle the sampled indices
+    """
+
+    def __init__(self, weights: list, num_samples: int, num_replicas: int, rank: int,
+                 replacement: bool = True, seed: int = 42, shuffle: bool = True):
+        self.weights = torch.tensor(weights, dtype=torch.double)
+        self.num_samples = num_samples
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.replacement = replacement
+        self.seed = seed
+        self.shuffle = shuffle
+        self.epoch = 0
+
+        # Total number of samples in the full dataset
+        self.num_samples_full = len(self.weights)
+
+        # Calculate roughly how many samples per rank
+        self.samples_per_rank = self.num_samples_full // num_replicas
+        if rank < (self.num_samples_full % num_replicas):
+            self.samples_per_rank += 1
+
+    def __iter__(self):
+        # Set seed based on epoch for reproducibility
+        g = torch.Generator()
+        g.manual_seed(self.seed + self.epoch + self.rank * 1000)  # Add rank offset
+
+        # Generate weighted random sample for this rank
+        if self.replacement:
+            # Sample with replacement from the full distribution
+            # Each rank samples independently with its own seed offset
+            indices = torch.multinomial(
+                self.weights, self.num_samples, replacement=True, generator=g
+            ).tolist()
+        else:
+            # Sample without replacement - shuffle by weight
+            shuffled_weights = self.weights * torch.rand(self.num_samples_full, generator=g)
+            _, indices = torch.topk(shuffled_weights, min(self.num_samples, self.num_samples_full))
+            indices = indices.tolist()
+
+        # Shuffle indices within this rank's sample
+        if self.shuffle:
+            perm = torch.randperm(len(indices), generator=g)
+            indices = [indices[i] for i in perm]
+
+        return iter(indices)
+
+    def __len__(self):
+        return self.num_samples
+
+    def set_epoch(self, epoch: int):
+        """Set epoch for shuffling consistency across epochs."""
+        self.epoch = epoch
+
+
 def get_dataloaders_oxe(cfg: str = "cfg.json",
                         n_bins: int = N_BINS,
                         keys_to_keep: dict = None,
                         renaming_keys: dict = None,
                         batch_size: int = 32,
-                        data_name_lst: list = None):
+                        data_name_lst: list = None,
+                        use_ddp: bool = False,
+                        local_rank: int = 0,
+                        world_size: int = 1,
+                        preprocessed_path: str = None):
+    """
+    Build train and validation dataloaders for OxE dataset.
+
+    In DDP mode with preprocessed_path: Load preprocessed shared-memory data saved by rank 0.
+    In DDP mode without preprocessed_path: Rank 0 does preprocessing, shares via shared memory.
+    In single-process mode: data is preprocessed in the usual way.
+
+    Args:
+        cfg: Path to config file
+        n_bins: Number of bins for discretization
+        keys_to_keep: Dict mapping dataset names to keys to keep
+        renaming_keys: Dict mapping dataset names to (old, new) key tuples
+        batch_size: Batch size for dataloaders
+        data_name_lst: Optional list of dataset names to load
+        use_ddp: Whether to use DDP mode with shared memory
+        local_rank: Current process rank (for DDP)
+        world_size: Total number of processes (for DDP)
+        preprocessed_path: Optional path to preprocessed dataset .pt file.
+                          If provided, skips expensive preprocessing.
+
+    Returns:
+        train_loader, val_loader, lang_dim
+    """
+    import torch.distributed as dist
 
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
 
@@ -388,50 +661,303 @@ def get_dataloaders_oxe(cfg: str = "cfg.json",
     if data_name_lst is None:
         data_name_lst = settings.get("data_name_lst", None)
 
-    ############## open data
-    data, metadata = open_combined_dataset(path_data, oxe_dataset_name, data_name_lst)
-    ############## discretize data
-    data_discretized, action_percentiles = apply_discretization(data, metadata, N_BINS)
-    
-    ############## filter data
-    data_filtered = filter_keys(data_discretized, keys_to_keep, renaming_keys)
+    if use_ddp:
+        # DDP mode: Rank 0 does preprocessing, shares via shared memory
+        if local_rank == 0:
+            if preprocessed_path and Path(preprocessed_path).exists():
+                # Load preprocessed data instead of doing expensive preprocessing
+                print(f"Loading preprocessed data from {preprocessed_path}")
+                loaded = torch.load(preprocessed_path, map_location='cpu')
+                shared_data = {
+                    'images': loaded['images'],
+                    'actions': loaded['actions'],
+                    'language_embeddings': loaded['language_embeddings'],
+                    'dataset_ids': loaded['dataset_ids'],
+                    'episode_indices': loaded['episode_indices'],
+                    'index_to_sample': loaded['index_to_sample'],
+                    'dataset_names': loaded['dataset_names'],
+                    'dataset_name_to_id': loaded['dataset_name_to_id'],
+                }
+                metadata = loaded['metadata']
+                action_percentiles = loaded['action_percentiles']
+                lang_dim = loaded.get('lang_dim', 384)
+            else:
+                # Preprocess data on rank 0
+                print("Preprocessing data on rank 0...")
+                data, metadata = open_combined_dataset(path_data, oxe_dataset_name, data_name_lst)
+                data_discretized, action_percentiles = apply_discretization(data, metadata, n_bins)
+                data_filtered = filter_keys(data_discretized, keys_to_keep, renaming_keys)
+                data_filtered = image_resizing(data_filtered)
+                data_filtered, lang_dim, text_model = add_language_embeddings(data_filtered)
 
-    ############## resize images
-    # print(data_filtered[0]['image'].shape)
-    image_resizing(data_filtered)
-    # print(data_filtered[0]['image'].shape)
+                # Build shared memory dataset
+                shared_data, metadata, action_percentiles, lang_dim = build_shared_memory_dataset(
+                    data_filtered, metadata
+                )
 
-    ############## embedding language
-    data_filtered, lang_dim, text_model = add_language_embeddings(data_filtered)
+                # Save preprocessed data for future runs
+                save_dir = Path("./preprocessed_data")
+                save_dir.mkdir(exist_ok=True)
+                save_path = save_dir / "preprocessed_dataset.pt"
+                torch.save({
+                    'images': shared_data['images'],
+                    'actions': shared_data['actions'],
+                    'language_embeddings': shared_data['language_embeddings'],
+                    'dataset_ids': shared_data['dataset_ids'],
+                    'episode_indices': shared_data['episode_indices'],
+                    'index_to_sample': shared_data['index_to_sample'],
+                    'dataset_names': shared_data['dataset_names'],
+                    'dataset_name_to_id': shared_data['dataset_name_to_id'],
+                    'metadata': metadata,
+                    'action_percentiles': action_percentiles,
+                    'lang_dim': lang_dim,
+                }, save_path)
+                print(f"Preprocessed data saved to {save_path}")
 
-    ############## Build dataloaders.
-    # get training and validation subsets. Force episodes to appear in train or val, but not both.
-    train_set, val_set = split_by_episode(data_filtered, val_frac=0.1, seed=42)
+            # Broadcast lang_dim to other ranks
+            dist.broadcast(torch.tensor([lang_dim]), src=0)
 
-    train_weights = make_weights(train_set, metadata)
-    val_weights   = make_weights(val_set, metadata)
+            # Notify other ranks that data is ready
+            dist.barrier()
 
-    train_sampler = WeightedRandomSampler(train_weights, num_samples=len(train_weights), replacement=True)
-    train_loader  = DataLoader(
-        train_set,
-        sampler=train_sampler,
-        batch_size=batch_size,
-        num_workers=2,
-        persistent_workers=True,
-        worker_init_fn=worker_init_fn,
-    )
+            # Create the dataset from shared data (for rank 0)
+            dataset = SharedMemoryRobotDataset(shared_data)
 
-    # no weighted sampling needed for validation. Just shuffle=False, full pass
-    val_loader = DataLoader(
-        val_set,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=2,
-        persistent_workers=True,
-        worker_init_fn=worker_init_fn,
-    )
+            # Build train/val indices for the full dataset
+            train_indices, val_indices = split_by_episode(dataset, val_frac=0.1, seed=42)
 
-    return train_loader, val_loader, lang_dim
+            # Compute weights based on dataset distribution (for the full dataset)
+            weights = []
+            dataset_id_to_name = {v: k for k, v in shared_data['dataset_name_to_id'].items()}
+            for i in range(len(dataset.images)):
+                ds_id = dataset.dataset_ids[i].item()
+                ds_name = dataset_id_to_name[ds_id]
+                ds_samples = sum(1 for j in range(len(dataset.images))
+                               if dataset.dataset_ids[j].item() == ds_id)
+                weights.append(1.0 / ds_samples)
+
+            # Create train dataset with distributed weighted sampler
+            train_dataset = Subset(dataset, train_indices)
+
+            # Compute weights for train dataset only
+            train_weights = [weights[i] for i in train_indices]
+            num_train_samples = len(train_indices)
+            num_replicas = world_size
+            rank = local_rank
+
+            # Create distributed weighted sampler for training
+            train_sampler = DistributedWeightedSampler(
+                weights=train_weights,
+                num_samples=num_train_samples // num_replicas + 1,  # Roughly equal per rank
+                num_replicas=num_replicas,
+                rank=rank,
+                replacement=True,
+                seed=42,
+                shuffle=True
+            )
+
+            train_loader = DataLoader(
+                train_dataset,
+                sampler=train_sampler,
+                batch_size=batch_size,
+                num_workers=1,
+                persistent_workers=True,
+                worker_init_fn=worker_init_fn,
+            )
+
+            # Create validation dataset - each rank uses DistributedSampler to get its portion
+            val_dataset = Subset(dataset, val_indices)
+            num_val_samples = len(val_indices)
+
+            # Use DistributedSampler for validation to evenly distribute samples
+            from torch.utils.data.distributed import DistributedSampler as ValDistributedSampler
+            val_sampler = ValDistributedSampler(
+                val_dataset,
+                num_replicas=num_replicas,
+                rank=rank,
+                shuffle=False
+            )
+
+            val_loader = DataLoader(
+                val_dataset,
+                sampler=val_sampler,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=1,
+                persistent_workers=True,
+                worker_init_fn=worker_init_fn,
+            )
+
+            print(f"Rank {local_rank}: Built dataloaders, train_samples={len(train_sampler)}, val_samples={len(val_sampler)}")
+
+            return train_loader, val_loader, lang_dim
+
+        else:
+            # Non-rank-0 processes: wait for rank 0 to finish preprocessing
+            dist.barrier()
+
+            # Load preprocessed data from shared location
+            if preprocessed_path and Path(preprocessed_path).exists():
+                print(f"Loading preprocessed data from {preprocessed_path}")
+                loaded = torch.load(preprocessed_path, map_location='cpu')
+                shared_data = {
+                    'images': loaded['images'],
+                    'actions': loaded['actions'],
+                    'language_embeddings': loaded['language_embeddings'],
+                    'dataset_ids': loaded['dataset_ids'],
+                    'episode_indices': loaded['episode_indices'],
+                    'index_to_sample': loaded['index_to_sample'],
+                    'dataset_names': loaded['dataset_names'],
+                    'dataset_name_to_id': loaded['dataset_name_to_id'],
+                }
+                metadata = loaded['metadata']
+                action_percentiles = loaded['action_percentiles']
+                lang_dim = loaded.get('lang_dim', 384)
+            else:
+                # Load from default preprocessed data location
+                default_path = Path("./preprocessed_data/preprocessed_dataset.pt")
+                if default_path.exists():
+                    print(f"Loading preprocessed data from {default_path}")
+                    loaded = torch.load(default_path, map_location='cpu')
+                    shared_data = {
+                        'images': loaded['images'],
+                        'actions': loaded['actions'],
+                        'language_embeddings': loaded['language_embeddings'],
+                        'dataset_ids': loaded['dataset_ids'],
+                        'episode_indices': loaded['episode_indices'],
+                        'index_to_sample': loaded['index_to_sample'],
+                        'dataset_names': loaded['dataset_names'],
+                        'dataset_name_to_id': loaded['dataset_name_to_id'],
+                    }
+                    metadata = loaded['metadata']
+                    action_percentiles = loaded['action_percentiles']
+                    lang_dim = loaded.get('lang_dim', 384)
+                else:
+                    raise RuntimeError("Preprocessed data not found. Run rank 0 preprocessing first.")
+
+            # Broadcast lang_dim from rank 0
+            lang_dim_tensor = torch.tensor([0])
+            dist.broadcast(lang_dim_tensor, src=0)
+            lang_dim = lang_dim_tensor.item()
+
+            # Build dataset from loaded shared data
+            dataset = SharedMemoryRobotDataset(shared_data)
+
+            # Build train/val indices for the full dataset
+            train_indices, val_indices = split_by_episode(dataset, val_frac=0.1, seed=42)
+
+            # Compute weights based on dataset distribution (for the full dataset)
+            weights = []
+            dataset_id_to_name = {v: k for k, v in shared_data['dataset_name_to_id'].items()}
+            for i in range(len(dataset.images)):
+                ds_id = dataset.dataset_ids[i].item()
+                ds_name = dataset_id_to_name[ds_id]
+                ds_samples = sum(1 for j in range(len(dataset.images))
+                               if dataset.dataset_ids[j].item() == ds_id)
+                weights.append(1.0 / ds_samples)
+
+            # Create train dataset with distributed weighted sampler
+            train_dataset = Subset(dataset, train_indices)
+
+            # Compute weights for train dataset only
+            train_weights = [weights[i] for i in train_indices]
+            num_train_samples = len(train_indices)
+            num_replicas = world_size
+            rank = local_rank
+
+            # Create distributed weighted sampler for training
+            train_sampler = DistributedWeightedSampler(
+                weights=train_weights,
+                num_samples=num_train_samples // num_replicas + 1,
+                num_replicas=num_replicas,
+                rank=rank,
+                replacement=True,
+                seed=42,
+                shuffle=True
+            )
+
+            train_loader = DataLoader(
+                train_dataset,
+                sampler=train_sampler,
+                batch_size=batch_size,
+                num_workers=1,
+                persistent_workers=True,
+                worker_init_fn=worker_init_fn,
+            )
+
+            # Create validation dataset
+            val_dataset = Subset(dataset, val_indices)
+            num_val_samples = len(val_indices)
+
+            # Use DistributedSampler for validation
+            from torch.utils.data.distributed import DistributedSampler as ValDistributedSampler
+            val_sampler = ValDistributedSampler(
+                val_dataset,
+                num_replicas=num_replicas,
+                rank=rank,
+                shuffle=False
+            )
+
+            val_loader = DataLoader(
+                val_dataset,
+                sampler=val_sampler,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=1,
+                persistent_workers=True,
+                worker_init_fn=worker_init_fn,
+            )
+
+            print(f"Rank {local_rank}: Built dataloaders from preprocessed data, train_samples={len(train_sampler)}, val_samples={len(val_sampler)}")
+
+            return train_loader, val_loader, lang_dim
+
+    else:
+        # Single-process mode: original behavior
+        ############## open data
+        data, metadata = open_combined_dataset(path_data, oxe_dataset_name, data_name_lst)
+        ############## discretize data
+        data_discretized, action_percentiles = apply_discretization(data, metadata, N_BINS)
+
+        ############## filter data
+        data_filtered = filter_keys(data_discretized, keys_to_keep, renaming_keys)
+
+        ############## resize images
+        # print(data_filtered[0]['image'].shape)
+        image_resizing(data_filtered)
+        # print(data_filtered[0]['image'].shape)
+
+        ############## embedding language
+        data_filtered, lang_dim, text_model = add_language_embeddings(data_filtered)
+
+        ############## Build dataloaders.
+        # get training and validation subsets. Force episodes to appear in train or val, but not both.
+        train_set, val_set = split_by_episode(data_filtered, val_frac=0.1, seed=42)
+
+        train_weights = make_weights(train_set, metadata)
+        val_weights   = make_weights(val_set, metadata)
+
+        train_sampler = WeightedRandomSampler(train_weights, num_samples=len(train_weights), replacement=True)
+        train_loader  = DataLoader(
+            train_set,
+            sampler=train_sampler,
+            batch_size=batch_size,
+            num_workers=2,
+            persistent_workers=True,
+            worker_init_fn=worker_init_fn,
+        )
+
+        # no weighted sampling needed for validation. Just shuffle=False, full pass
+        val_loader = DataLoader(
+            val_set,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=2,
+            persistent_workers=True,
+            worker_init_fn=worker_init_fn,
+        )
+
+        return train_loader, val_loader, lang_dim
 
 
 

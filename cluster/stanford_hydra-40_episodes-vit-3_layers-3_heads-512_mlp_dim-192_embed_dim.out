@@ -1,0 +1,37 @@
+---------------------------------------------------------------
+---------------------------------------------------------------
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+---------------------------------------------------------------
+---------------------------------------------------------------
+DDP initialized: local_rank=11, world_size=12DDP initialized: local_rank=0, world_size=12
+
+DDP initialized: local_rank=4, world_size=12
+DDP initialized: local_rank=3, world_size=12
+DDP initialized: local_rank=2, world_size=12
+DDP initialized: local_rank=1, world_size=12DDP initialized: local_rank=5, world_size=12
+DDP initialized: local_rank=9, world_size=12
+
+DDP initialized: local_rank=8, world_size=12DDP initialized: local_rank=6, world_size=12
+DDP initialized: local_rank=7, world_size=12
+
+DDP initialized: local_rank=10, world_size=12
+n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40n_episodes: 40
+n_episodes: 40
+
+
+
+
+
+
+
+
+
+
+============ Job Information ===================================================
+Submitted: 2026-10-26T16:31:06
+Started: 2026-10-26T16:31:06
+Ended: 2026-10-26T16:38:45
+Elapsed: 8 min, Limit: 1440 min, Difference: 1432 min
+CPUs: 12, Nodes: 1
+Estimated credit Consumption: 0.80 core-hours
+================================================================================
