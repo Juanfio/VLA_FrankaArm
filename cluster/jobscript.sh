@@ -4,14 +4,19 @@
 ##SBATCH --qos=7d # SCC: --qos=7d, CIDBN: comment it.
 #SBATCH -t 24:00:00 # SCC: 7-00, CIDBN: 14-00, 48:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks=1 # Single task with multiple CPUs
-#SBATCH --cpus-per-task=68 # 68 CPUs per task for multithreaded preprocessing
-#SBATCH -A cidbn_wibral_neuro_human ## scc_users // cidbn_legacy
-#SBATCH -p cidbn ## medium // cidbn.
-#SBATCH --output=stanford_hydra-40_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.out #/dev/null
-#SBATCH --error=stanford_hydra-40_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim.err #/dev/null
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=48
+#SBATCH -A cidbn_wibral_neuro_human
+#SBATCH -p cidbn
+#SBATCH --output=stanford_hydra-%j.out
+#SBATCH --error=stanford_hydra-%j.err
 
-##SBATCH --mem=480G # 500G
+# Set environment variables
+NPROC_PER_NODE=8 # Defines the number of DDP processes spanwed.
+CPUS_PER_RANK=$((SLURM_CPUS_PER_TASK / NPROC_PER_NODE)) # CPU threads per DDP process
+export OMP_NUM_THREADS=$CPUS_PER_RANK
+export MKL_NUM_THREADS=$CPUS_PER_RANK
+export OPENBLAS_NUM_THREADS=1
 
 # Load required modules
 module load gcc/11.5.0
@@ -21,40 +26,19 @@ module load miniforge3/24.3.0-0
 cd /user/fiorenza/u24781/
 source activate robotic
 
-echo ---------------------------------------------------------------
-echo ---------------------------------------------------------------
-which python
-echo ---------------------------------------------------------------
-echo ---------------------------------------------------------------
-
-# Add project root to Python path so 'model' module is findable
+# Add project root to Python path
 cd /user/fiorenza/u24781/.project/dir.project/users/fiorenza/project_repositories/VLA_FrankaArm/
 export PYTHONPATH="/user/fiorenza/u24781/.project/dir.project/users/fiorenza/project_repositories/VLA_FrankaArm:$PYTHONPATH"
 
-######## Run with torchrun for DDP support.
-# torchrun spawns processes and handles coordination automatically
-# When running under SLURM, torchrun uses SLURM's environment variables
-# We use --nproc_per_node=$SLURM_NTASKS to match the single task with cpus-per-task
-
-# Clean up any stale rendezvous files from previous runs
+# Clean up any stale rendezvous files
 rm -f /tmp/ddp_rendezvous_${SLURM_JOBID}.txt 2>/dev/null
-
-# Use SLURM_NTASKS for --nproc_per_node since we have 1 task with multiple CPUs
-# SLURM_NTASKS is set to 1 by --ntasks=1, but we want 68 processes
-# So we use --cpus-per-task=68 with --nproc_per_node=68
-
-# Optional: Use preprocessed data if available (skip expensive preprocessing)
-# Uncomment and modify the following line to use preprocessed data:
-# PREPROCESSED_ARGS="--preprocessed_path preprocessed_data/preprocessed_dataset.pt"
 
 torchrun \
-    --nproc_per_node=68 \
+    --nproc_per_node=$NPROC_PER_NODE \
     --master_port=29500 \
-    -m model.train --settings cfg_stanford_hydra.json --n_epochs 30 --use_ddp $PREPROCESSED_ARGS
+    -m model.train --settings cfg_stanford_hydra.json --n_epochs 30 --use_ddp $PREPROCESSED_ARGS 2>&1
 EXIT_CODE=$?
 
-# Clean up rendezvous file after training
 rm -f /tmp/ddp_rendezvous_${SLURM_JOBID}.txt 2>/dev/null
-
 conda deactivate
 exit $EXIT_CODE
