@@ -223,16 +223,16 @@ if __name__ == "__main__":
     local_rank, world_size = 0, 1
     if args.use_ddp:
         local_rank, world_size = setup_distributed_training()
-        print(
-        f"Batch size ={BATCH_SIZE}"
-        f"Rank={dist.get_rank()}, "
-        f"Local_rank={local_rank}, "
-        f"World_size={world_size}, "
-        f"CPUs={os.getenv('SLURM_CPUS_PER_TASK')}, "
-        f"OMP_THREADS={os.getenv('OMP_NUM_THREADS')}, "
-        f"Available_CPUs={len(os.sched_getaffinity(0))}",
-        f"PyTorch threads: {torch.get_num_threads()}",
-        flush=True
+    print(
+    f"Batch size={BATCH_SIZE}, "
+    f"Rank={dist.get_rank()}, "
+    f"Local_rank={local_rank}, "
+    f"World_size={world_size}, "
+    f"CPUs={os.getenv('SLURM_CPUS_PER_TASK')}, "
+    f"OMP_THREADS={os.getenv('OMP_NUM_THREADS')}, "
+    f"Available_CPUs={len(os.sched_getaffinity(0))}, ",
+    f"PyTorch threads: {torch.get_num_threads()}\n",
+    flush=True
     )
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{args.settings}"))
     torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))

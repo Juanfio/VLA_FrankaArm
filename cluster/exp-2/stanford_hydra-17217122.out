@@ -1,0 +1,93 @@
+n_episodes: 40
+3 unique instructions
+Preprocessing time: 1.44 min
+Vision-only Model
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+Resuming from epoch 6
+epoch   6 | train 3.0057/0.1518 | val 2.9960/0.1501
+Training + validation time: 3.65 min
+epoch   7 | train 3.0007/0.1523 | val 2.9992/0.1501
+Training + validation time: 3.32 min
+epoch   8 | train 2.9929/0.1561 | val 2.9942/0.1501
+Training + validation time: 2.98 min
+ -> saved best checkpoint (2.9942)
+epoch   9 | train 3.0019/0.1536 | val 2.9980/0.1501
+Training + validation time: 3.41 min
+epoch  10 | train 3.0013/0.1541 | val 2.9974/0.1501
+Training + validation time: 3.21 min
+epoch  11 | train 2.9996/0.1525 | val 2.9974/0.1501
+Training + validation time: 3.12 min
+epoch  12 | train 3.0037/0.1510 | val 2.9990/0.1501
+Training + validation time: 3.35 min
+epoch  13 | train 3.0009/0.1545 | val 3.0001/0.1501
+Training + validation time: 2.76 min
+epoch  14 | train 2.9985/0.1551 | val 2.9980/0.1501
+Training + validation time: 2.97 min
+epoch  15 | train 3.0040/0.1528 | val 3.0004/0.1501
+Training + validation time: 3.17 min
+epoch  16 | train 2.9982/0.1549 | val 3.0010/0.1501
+Training + validation time: 2.90 min
+epoch  17 | train 3.0029/0.1536 | val 3.0005/0.1501
+Training + validation time: 2.78 min
+epoch  18 | train 3.0069/0.1522 | val 3.0008/0.1501
+Training + validation time: 2.89 min
+epoch  19 | train 3.0035/0.1545 | val 3.0005/0.1501
+Training + validation time: 3.07 min
+epoch  20 | train 3.0084/0.1514 | val 3.0018/0.1501
+Training + validation time: 2.45 min
+epoch  21 | train 3.0118/0.1514 | val 3.0053/0.1501
+Training + validation time: 2.91 min
+epoch  22 | train 3.0012/0.1541 | val 3.0022/0.1501
+Training + validation time: 2.97 min
+epoch  23 | train 3.0051/0.1547 | val 3.0036/0.1501
+Training + validation time: 2.98 min
+epoch  24 | train 3.0074/0.1543 | val 3.0040/0.1501
+Training + validation time: 3.71 min
+epoch  25 | train 3.0067/0.1537 | val 3.0085/0.1501
+Training + validation time: 3.32 min
+epoch  26 | train 3.0108/0.1522 | val 3.0079/0.1501
+Training + validation time: 3.16 min
+epoch  27 | train 3.0018/0.1566 | val 3.0074/0.1501
+Training + validation time: 3.05 min
+epoch  28 | train 3.0072/0.1561 | val 3.0084/0.1501
+Training + validation time: 2.88 min
+epoch  29 | train 3.0118/0.1541 | val 3.0106/0.1501
+Training + validation time: 3.14 min
+epoch  30 | train 3.0112/0.1550 | val 3.0124/0.1501
+Training + validation time: 3.20 min
+============ Job Information ===================================================
+Submitted: 2026-11-10T10:33:48
+Started: 2026-11-10T10:33:50
+Ended: 2026-11-10T11:53:05
+Elapsed: 80 min, Limit: 1440 min, Difference: 1360 min
+CPUs: 48, Nodes: 1
+Estimated credit Consumption: 32.00 core-hours
+================================================================================

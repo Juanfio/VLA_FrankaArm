@@ -17,6 +17,7 @@ CPUS_PER_RANK=$((SLURM_CPUS_PER_TASK / NPROC_PER_NODE)) # CPU threads per DDP pr
 export OMP_NUM_THREADS=$CPUS_PER_RANK
 export MKL_NUM_THREADS=$CPUS_PER_RANK
 export OPENBLAS_NUM_THREADS=1
+MASTER_PORT=$((15000 + SLURM_JOB_ID % 40000))
 
 # Load required modules
 module load gcc/11.5.0
@@ -35,7 +36,7 @@ rm -f /tmp/ddp_rendezvous_${SLURM_JOBID}.txt 2>/dev/null
 
 torchrun \
     --nproc_per_node=$NPROC_PER_NODE \
-    --master_port=29500 \
+    --master_port=$MASTER_PORT \
     -m model.train --settings cfg_stanford_hydra.json --n_epochs 30 --use_ddp $PREPROCESSED_ARGS 2>&1
 EXIT_CODE=$?
 

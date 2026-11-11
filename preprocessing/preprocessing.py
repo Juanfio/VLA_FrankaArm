@@ -404,9 +404,13 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
         data, lang_dim, _ = add_language_embeddings(data)
         train_idx, val_idx = split_by_episode(data)
         train_set, val_set = Subset(data, train_idx), Subset(data, val_idx)
-        train_loader = DataLoader(train_set, batch_size, True, num_workers=2,
-                                  worker_init_fn=worker_init_fn,
-                                  sampler=WeightedRandomSampler(make_weights(train_set, metadata), len(train_set), True))
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=False, 
+                                    sampler=WeightedRandomSampler(
+                                        make_weights(train_set, metadata),
+                                        num_samples=len(train_set),
+                                        replacement=True
+                                    ), num_workers=2, worker_init_fn=worker_init_fn
+                                )
         val_loader = DataLoader(val_set, batch_size, False, num_workers=2, worker_init_fn=worker_init_fn)
         return train_loader, val_loader, lang_dim
 
