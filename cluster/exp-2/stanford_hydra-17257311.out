@@ -1,0 +1,642 @@
+JOB START: Thu Nov 12 09:44:31 CET 2026
+JOB ID: 17257311
+CPUs: 48
+DDP processes: 12
+OMP threads: 4
+Modules loaded: Thu Nov 12 09:45:28 CET 2026
+Environment activated: Thu Nov 12 09:45:31 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Thu Nov 12 09:45:31 CET 2026
+[09:45:33] PID=3875579 RANK=0 Starting train.py
+[09:45:33] PID=3875579 RANK=0 Importing models
+[09:45:33] PID=3875587 RANK=8 Starting train.py
+[09:45:33] PID=3875587 RANK=8 Importing models
+[09:45:33] PID=3875584 RANK=5 Starting train.py
+[09:45:33] PID=3875584 RANK=5 Importing models
+[09:45:33] PID=3875585 RANK=6 Starting train.py
+[09:45:33] PID=3875585 RANK=6 Importing models
+[09:45:33] PID=3875582 RANK=3 Starting train.py
+[09:45:33] PID=3875582 RANK=3 Importing models
+[09:45:33] PID=3875581 RANK=2 Starting train.py
+[09:45:33] PID=3875581 RANK=2 Importing models
+[09:45:33] PID=3875588 RANK=9 Starting train.py
+[09:45:33] PID=3875588 RANK=9 Importing models
+[09:45:33] PID=3875586 RANK=7 Starting train.py
+[09:45:33] PID=3875586 RANK=7 Importing models
+[09:45:33] PID=3875589 RANK=10 Starting train.py
+[09:45:33] PID=3875589 RANK=10 Importing models
+[09:45:33] PID=3875580 RANK=1 Starting train.py
+[09:45:33] PID=3875580 RANK=1 Importing models
+[09:45:33] PID=3875583 RANK=4 Starting train.py
+[09:45:33] PID=3875583 RANK=4 Importing models
+[09:45:33] PID=3875590 RANK=11 Starting train.py
+[09:45:33] PID=3875590 RANK=11 Importing models
+[09:45:38] PID=3875582 RANK=3 Importing preprocessing
+[09:45:38] PID=3875579 RANK=0 Importing preprocessing
+[09:45:38] PID=3875584 RANK=5 Importing preprocessing
+[09:45:38] PID=3875585 RANK=6 Importing preprocessing
+[09:45:38] PID=3875588 RANK=9 Importing preprocessing
+[09:45:38] PID=3875587 RANK=8 Importing preprocessing
+[09:45:38] PID=3875580 RANK=1 Importing preprocessing
+[09:45:38] PID=3875590 RANK=11 Importing preprocessing
+[09:45:38] PID=3875583 RANK=4 Importing preprocessing
+[09:45:38] PID=3875586 RANK=7 Importing preprocessing
+[09:45:38] PID=3875589 RANK=10 Importing preprocessing
+[09:45:38] PID=3875581 RANK=2 Importing preprocessing
+[Preprocessing import][Rank 3] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 0] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 5] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 6] Starting preprocessing imports (0.00s)[Preprocessing import][Rank 9] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 8] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 1] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 11] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 4] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 7] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 10] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 2] Starting preprocessing imports (0.00s)
+[Preprocessing import][Rank 3] Importing torch (6.36s)
+[Preprocessing import][Rank 0] Importing torch (7.39s)
+[Preprocessing import][Rank 5] Importing torch (7.37s)
+
+[Preprocessing import][Rank 9] Importing torch (7.99s)
+[Preprocessing import][Rank 8] Importing torch (7.47s)
+[Preprocessing import][Rank 1] Importing torch (6.82s)
+[Preprocessing import][Rank 11] Importing torch (6.59s)
+[Preprocessing import][Rank 4] Importing torch (6.46s)
+[Preprocessing import][Rank 7] Importing torch (6.70s)
+[Preprocessing import][Rank 10] Importing torch (6.52s)
+[Preprocessing import][Rank 2] Importing torch (5.90s)
+[Preprocessing import][Rank 3] Importing torch.utils.data (11.98s)
+[Preprocessing import][Rank 0] Importing torch.utils.data (11.62s)
+[Preprocessing import][Rank 5] Importing torch.utils.data (11.28s)
+[Preprocessing import][Rank 6] Importing torch (11.14s)
+[Preprocessing import][Rank 9] Importing torch.utils.data (11.35s)
+[Preprocessing import][Rank 8] Importing torch.utils.data (11.21s)
+[Preprocessing import][Rank 1] Importing torch.utils.data (10.98s)
+[Preprocessing import][Rank 11] Importing torch.utils.data (11.06s)
+[Preprocessing import][Rank 4] Importing torch.utils.data (11.43s)
+[Preprocessing import][Rank 7] Importing torch.utils.data (11.65s)
+[Preprocessing import][Rank 10] Importing torch.utils.data (11.53s)
+[Preprocessing import][Rank 2] Importing torch.utils.data (10.61s)
+[Preprocessing import][Rank 3] Importing preprocessing.utils (16.72s)
+[Preprocessing import][Rank 0] Importing preprocessing.utils (16.42s)
+[Preprocessing import][Rank 5] Importing preprocessing.utils (16.42s)
+[Preprocessing import][Rank 6] Importing torch.utils.data (16.61s)
+[Preprocessing import][Rank 9] Importing preprocessing.utils (16.76s)[Preprocessing import][Rank 8] Importing preprocessing.utils (16.53s)
+[Preprocessing import][Rank 1] Importing preprocessing.utils (16.42s)
+[Preprocessing import][Rank 11] Importing preprocessing.utils (16.37s)
+[Preprocessing import][Rank 4] Importing preprocessing.utils (16.53s)
+[Preprocessing import][Rank 7] Importing preprocessing.utils (16.72s)
+[Preprocessing import][Rank 10] Importing preprocessing.utils (16.77s)
+[Preprocessing import][Rank 2] Importing preprocessing.utils (15.97s)
+[Preprocessing import][Rank 3] Importing json/pathlib/numpy (22.11s)
+[Preprocessing import][Rank 0] Importing json/pathlib/numpy (21.62s)
+[Preprocessing import][Rank 5] Importing json/pathlib/numpy (21.40s)
+[Preprocessing import][Rank 6] Importing preprocessing.utils (21.83s)
+
+[Preprocessing import][Rank 8] Importing json/pathlib/numpy (21.87s)
+[Preprocessing import][Rank 1] Importing json/pathlib/numpy (21.65s)
+[Preprocessing import][Rank 11] Importing json/pathlib/numpy (21.91s)
+[Preprocessing import][Rank 4] Importing json/pathlib/numpy (21.83s)
+[Preprocessing import][Rank 7] Importing json/pathlib/numpy (21.73s)
+[Preprocessing import][Rank 10] Importing json/pathlib/numpy (21.52s)
+[Preprocessing import][Rank 2] Importing json/pathlib/numpy (20.91s)
+[Preprocessing import][Rank 3] Preprocessing imports completed (27.43s)
+[Preprocessing import][Rank 0] Preprocessing imports completed (26.88s)
+[Preprocessing import][Rank 5] Preprocessing imports completed (26.35s)
+[Preprocessing import][Rank 6] Importing json/pathlib/numpy (26.26s)
+[Preprocessing import][Rank 9] Importing json/pathlib/numpy (26.42s)
+[Preprocessing import][Rank 8] Preprocessing imports completed (26.27s)
+[Preprocessing import][Rank 1] Preprocessing imports completed (25.93s)
+[Preprocessing import][Rank 11] Preprocessing imports completed (25.61s)
+[Preprocessing import][Rank 4] Preprocessing imports completed (25.40s)
+[Preprocessing import][Rank 7] Preprocessing imports completed (25.27s)
+[Preprocessing import][Rank 10] Preprocessing imports completed (25.17s)
+[Preprocessing import][Rank 2] Preprocessing imports completed (24.36s)
+[09:46:10] PID=3875582 RANK=3 Importing settings
+[09:46:10] PID=3875579 RANK=0 Importing settings
+[09:46:10] PID=3875584 RANK=5 Importing settings
+[Preprocessing import][Rank 6] Preprocessing imports completed (30.80s)
+[Preprocessing import][Rank 9] Preprocessing imports completed (30.93s)
+[09:46:12] PID=3875587 RANK=8 Importing settings
+[09:46:12] PID=3875580 RANK=1 Importing settings
+[09:46:12] PID=3875590 RANK=11 Importing settings
+[09:46:13] PID=3875583 RANK=4 Importing settings
+[09:46:13] PID=3875586 RANK=7 Importing settings
+[09:46:13] PID=3875589 RANK=10 Importing settings
+[09:46:14] PID=3875581 RANK=2 Importing settings
+[09:46:15] PID=3875582 RANK=3 Other imports
+[09:46:15] PID=3875579 RANK=0 Other imports
+[09:46:15] PID=3875584 RANK=5 Other imports
+[09:46:16] PID=3875585 RANK=6 Importing settings
+[09:46:16] PID=3875588 RANK=9 Importing settings
+[09:46:17] PID=3875587 RANK=8 Other imports
+[09:46:18] PID=3875580 RANK=1 Other imports
+[09:46:18] PID=3875590 RANK=11 Other imports
+[09:46:19] PID=3875583 RANK=4 Other imports
+[09:46:19] PID=3875586 RANK=7 Other imports
+[09:46:20] PID=3875589 RANK=10 Other imports
+[09:46:20] PID=3875581 RANK=2 Other imports
+[BEFORE INIT] Rank=3/12, Local_rank=3, PID=3875582
+[BEFORE INIT] Rank=0/12, Local_rank=0, PID=3875579
+[BEFORE INIT] Rank=5/12, Local_rank=5, PID=3875584
+[09:46:22] PID=3875585 RANK=6 Other imports
+[09:46:22] PID=3875588 RANK=9 Other imports
+[BEFORE INIT] Rank=8/12, Local_rank=8, PID=3875587
+[BEFORE INIT] Rank=1/12, Local_rank=1, PID=3875580
+[BEFORE INIT] Rank=11/12, Local_rank=11, PID=3875590
+[BEFORE INIT] Rank=4/12, Local_rank=4, PID=3875583
+[BEFORE INIT] Rank=7/12, Local_rank=7, PID=3875586
+[BEFORE INIT] Rank=10/12, Local_rank=10, PID=3875589
+[BEFORE INIT] Rank=2/12, Local_rank=2, PID=3875581
+[BEFORE INIT] Rank=6/12, Local_rank=6, PID=3875585
+[BEFORE INIT] Rank=9/12, Local_rank=9, PID=3875588
+[AFTER INIT] Rank=0 successfully initialized
+[AFTER INIT] Rank=2 successfully initialized[AFTER INIT] Rank=5 successfully initialized
+[AFTER INIT] Rank=10 successfully initialized
+[AFTER INIT] Rank=4 successfully initialized
+[AFTER INIT] Rank=1 successfully initialized
+[AFTER INIT] Rank=3 successfully initialized
+[AFTER INIT] Rank=9 successfully initialized
+[AFTER INIT] Rank=11 successfully initialized
+[AFTER INIT] Rank=8 successfully initialized[AFTER INIT] Rank=6 successfully initialized
+[AFTER INIT] Rank=7 successfully initialized
+Batch size=64, Rank=0, Local_rank=0, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  
+Batch size=64, Rank=5, Local_rank=5, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=10, Local_rank=10, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=4, Local_rank=4, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=1, Local_rank=1, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=3, Local_rank=3, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=9, Local_rank=9, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48, Batch size=64, Rank=11, Local_rank=11, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  
+Batch size=64, Rank=6, Local_rank=6, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  Batch size=64, Rank=7, Local_rank=7, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48, PyTorch threads: 4
+
+Batch size=64, Rank=2, Local_rank=2, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48, PyTorch threads: 4
+
+PyTorch threads: 4
+PyTorch threads: 4
+PyTorch threads: 4
+
+PyTorch threads: 4
+
+ PyTorch threads: 4
+PyTorch threads: 4
+Batch size=64, Rank=8, Local_rank=8, World_size=12, CPUs=48, OMP_THREADS=4, Available_CPUs=48,  PyTorch threads: 4
+
+ PyTorch threads: 4
+ PyTorch threads: 4
+n_episodes: 40
+
+
+
+
+PyTorch threads: 4
+
+
+
+Total samples: 26794
+3 unique instructions
+Preprocessed data saved to preprocessed_data/preprocessed_dataset.pt
+Preprocessing time: 10.38 min
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+Vision-only Model
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+=====================Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+=====================
+Name: patch_embed 
+Child: PatchEmbedding(
+  (proj): Conv2d(3, 192, kernel_size=(16, 16), stride=(16, 16))
+)
+=====================
+Name: dropout 
+Child: Dropout(p=0.1, inplace=False)
+=====================
+Name: encoder_blocks 
+Child: ModuleList(
+  (0-2): 3 x TransformerEncoderBlock(
+    (norm1): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (attn): MultiheadAttention(
+      (out_proj): NonDynamicallyQuantizableLinear(in_features=192, out_features=192, bias=True)
+    )
+    (norm2): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+    (mlp): Sequential(
+      (0): Linear(in_features=192, out_features=512, bias=True)
+      (1): GELU(approximate='none')
+      (2): Dropout(p=0.1, inplace=False)
+      (3): Linear(in_features=512, out_features=192, bias=True)
+      (4): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+=====================
+Name: final_norm 
+Child: LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+epoch   0 | train 3.2936/0.1213 | val 3.1511/0.1434
+Training + validation time: 4.22 min
+ -> saved best checkpoint (3.1511)
+epoch   1 | train 3.0972/0.1496 | val 3.0357/0.1507
+Training + validation time: 0.72 min
+ -> saved best checkpoint (3.0357)
+epoch   2 | train 3.0288/0.1545 | val 3.0118/0.1507
+Training + validation time: 0.71 min
+ -> saved best checkpoint (3.0118)
+epoch   3 | train 3.0146/0.1546 | val 3.0056/0.1507
+Training + validation time: 0.70 min
+ -> saved best checkpoint (3.0056)
+epoch   4 | train 3.0092/0.1547 | val 3.0024/0.1507
+Training + validation time: 0.68 min
+ -> saved best checkpoint (3.0024)
+epoch   5 | train 3.0060/0.1547 | val 3.0005/0.1507
+Training + validation time: 0.73 min
+ -> saved best checkpoint (3.0005)
+epoch   6 | train 3.0037/0.1547 | val 2.9992/0.1507
+Training + validation time: 0.73 min
+ -> saved best checkpoint (2.9992)
+epoch   7 | train 3.0021/0.1547 | val 2.9983/0.1507
+Training + validation time: 0.69 min
+ -> saved best checkpoint (2.9983)
+epoch   8 | train 3.0009/0.1547 | val 2.9977/0.1507
+Training + validation time: 0.68 min
+ -> saved best checkpoint (2.9977)
+epoch   9 | train 3.0001/0.1547 | val 2.9971/0.1507
+Training + validation time: 0.69 min
+ -> saved best checkpoint (2.9971)
+epoch  10 | train 2.9995/0.1547 | val 2.9967/0.1507
+Training + validation time: 0.71 min
+ -> saved best checkpoint (2.9967)
+epoch  11 | train 2.9990/0.1547 | val 2.9964/0.1507
+Training + validation time: 0.72 min
+ -> saved best checkpoint (2.9964)
+epoch  12 | train 2.9986/0.1547 | val 2.9962/0.1507
+Training + validation time: 0.71 min
+ -> saved best checkpoint (2.9962)
+epoch  13 | train 2.9983/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.70 min
+ -> saved best checkpoint (2.9960)
+epoch  14 | train 2.9980/0.1547 | val 2.9959/0.1507
+Training + validation time: 0.70 min
+ -> saved best checkpoint (2.9959)
+epoch  15 | train 2.9978/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.72 min
+epoch  16 | train 2.9976/0.1547 | val 2.9959/0.1507
+Training + validation time: 0.70 min
+epoch  17 | train 2.9974/0.1547 | val 2.9961/0.1507
+Training + validation time: 0.69 min
+epoch  18 | train 2.9972/0.1547 | val 2.9970/0.1507
+Training + validation time: 0.69 min
+epoch  19 | train 2.9972/0.1547 | val 2.9958/0.1507
+Training + validation time: 0.70 min
+ -> saved best checkpoint (2.9958)
+epoch  20 | train 2.9969/0.1547 | val 2.9959/0.1507
+Training + validation time: 0.72 min
+epoch  21 | train 2.9967/0.1547 | val 2.9956/0.1507
+Training + validation time: 0.70 min
+ -> saved best checkpoint (2.9956)
+epoch  22 | train 2.9965/0.1547 | val 2.9974/0.1507
+Training + validation time: 0.69 min
+epoch  23 | train 2.9973/0.1547 | val 2.9957/0.1507
+Training + validation time: 0.73 min
+epoch  24 | train 2.9973/0.1547 | val 2.9957/0.1507
+Training + validation time: 0.70 min
+epoch  25 | train 2.9971/0.1547 | val 2.9958/0.1507
+Training + validation time: 0.69 min
+epoch  26 | train 2.9971/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.70 min
+epoch  27 | train 2.9971/0.1547 | val 2.9959/0.1507
+Training + validation time: 0.71 min
+epoch  28 | train 2.9972/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.71 min
+epoch  29 | train 2.9971/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.74 min
+epoch  30 | train 2.9972/0.1547 | val 2.9960/0.1507
+Training + validation time: 0.71 min
+============ Job Information ===================================================
+Submitted: 2026-11-12T09:44:16
+Started: 2026-11-12T09:44:21
+Ended: 2026-11-12T10:22:54
+Elapsed: 39 min, Limit: 1440 min, Difference: 1401 min
+CPUs: 48, Nodes: 1
+Estimated credit Consumption: 15.60 core-hours
+================================================================================

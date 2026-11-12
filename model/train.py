@@ -1,20 +1,40 @@
+import os
+import time
+
+# def debug_log(message):
+#     print(
+#         f"[{time.strftime('%H:%M:%S')}] "
+#         f"PID={os.getpid()} "
+#         f"RANK={os.environ.get('RANK', '?')} "
+#         f"{message}",
+#         flush=True
+#     )
+
+# debug_log("Starting train.py")
+
+
+# debug_log("Importing models")
 from .models import VisionTransformer, ActionHead, RoboticActionModel
-from preprocessing.preprocessing import *
+# debug_log("Importing preprocessing")
+from preprocessing.preprocessing import get_dataloaders_oxe
+# debug_log("Importing settings")
 from preprocessing.utils import get_settings
 
+# debug_log("Other imports")
+import torch
 import torch.nn.functional as F
 from torch.optim import Adam
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from pathlib import Path
 import argparse
 import numpy as np
 import h5py
-import os
-import time
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
+from datetime import timedelta
 
 N_BINS = 32
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 HYDRA = "stanford_hydra_dataset_converted_externally_to_rlds"
 
 
@@ -104,18 +124,31 @@ def evaluate(model, loader, device, use_ddp=False):
 
 
 def setup_distributed_training():
-    # initialize the DDP training
-    local_rank = int(os.environ.get("LOCAL_RANK", os.environ.get("SLURM_LOCALID", 0)))
-    world_size = int(os.environ.get("WORLD_SIZE", os.environ.get("SLURM_NTASKS", 1)))
-    rank = int(os.environ.get("RANK", os.environ.get("SLURM_PROCID", 0)))
 
-    if "MASTER_ADDR" not in os.environ:
-        os.environ["MASTER_ADDR"] = "localhost"
-    if "MASTER_PORT" not in os.environ:
-        os.environ["MASTER_PORT"] = "29500"
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    rank = int(os.environ.get("RANK", 0))
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+    os.environ.setdefault("MASTER_ADDR", "localhost")
+    os.environ.setdefault("MASTER_PORT", "29500")
+
+    print(
+        f"[BEFORE INIT] Rank={rank}/{world_size}, "
+        f"Local_rank={local_rank}, PID={os.getpid()}",
+        flush=True
+    )
 
     if not dist.is_initialized():
-        dist.init_process_group(backend="gloo", init_method="env://")
+        dist.init_process_group(
+            backend="gloo",
+            init_method="env://",
+            timeout=timedelta(minutes=30)
+        )
+
+    print(
+        f"[AFTER INIT] Rank={dist.get_rank()} successfully initialized",
+        flush=True
+    )
 
     return local_rank, world_size
 

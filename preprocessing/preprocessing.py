@@ -1,14 +1,35 @@
+# import os
+# import time
+
+# _import_start = time.perf_counter()
+
+# def import_log(message):
+#     rank = os.environ.get("RANK", "?")
+#     elapsed = time.perf_counter() - _import_start
+
+#     print(
+#         f"[Preprocessing import][Rank {rank}] "
+#         f"{message} ({elapsed:.2f}s)",
+#         flush=True
+#     )
+
+# import_log("Starting preprocessing imports")
+
+# import_log("Importing torch")
 import torch
+
+# import_log("Importing torch.utils.data")
 from torch.utils.data import Dataset, DataLoader, Subset, WeightedRandomSampler
-from torchvision import transforms
-import torchvision.transforms.functional as TF
-from sentence_transformers import SentenceTransformer
+
+# import_log("Importing preprocessing.utils")
 from preprocessing.utils import get_settings
 
+# import_log("Importing json/pathlib/numpy")
 import json
 from pathlib import Path
-import h5py
 import numpy as np
+
+# import_log("Preprocessing imports completed")
 
 N_BINS = 32
 LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-MiniLM-L6-v2"
@@ -19,6 +40,7 @@ LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-Min
 
 def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None):
     """Load combined dataset from HDF5, returns list[dict] and metadata."""
+    import h5py
     data, metadata = [], {}
     with h5py.File(f"{path_data}/{oxe_dataset_name}.h5", "r") as f:
         names = data_name_lst if data_name_lst else f.keys()
@@ -122,6 +144,9 @@ def episode_to_ids(dataset):
 
 
 def image_resizing(data, out_dim=224, mean=None, std=None):
+    from torchvision import transforms
+    import torchvision.transforms.functional as TF
+
     """Resize and normalize images, computing stats per (dataset, episode) by default."""
     ep_to_idx = episode_to_ids(data)
     for (ds_name, ep_idx), indices in ep_to_idx.items():
@@ -147,6 +172,9 @@ def _to_str(x):
 
 
 def load_text_model(name="all-MiniLM-L6-v2", local_dir=LOCAL_MODEL_DIR):
+    
+    from sentence_transformers import SentenceTransformer # only rank 0 performs preprocessing and needs this.
+    
     if (local_dir / "modules.json").exists(): return SentenceTransformer(str(local_dir))
     model = SentenceTransformer(name)
     local_dir.mkdir(parents=True, exist_ok=True)
@@ -475,6 +503,7 @@ def _make_dataloader(dataset, indices, world_size, rank, batch_size, is_train):
 
 def load_sim_demos(hdf5_path, dataset_name="simulated"):
     """Load simulated dataset from HDF5."""
+    import h5py
     data, metadata = [], {dataset_name: {}}
     total_samples = 0
     with h5py.File(hdf5_path, "r") as f:
