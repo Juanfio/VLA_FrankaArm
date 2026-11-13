@@ -10,6 +10,7 @@ Experiment	DDP processes	  cpus-per-task      Threads/process   Batch/process	  
 
 
     Conclusion:
+        * Goal: Test scaling of training with increasing DDP and cpus-per-process.
         * Increasing DDP processes while decreasing batch size (i.e., remaining global batch constant. Exp A-D) decreases training time.
         * Preprocessing remained almost constant.
         * The global batch represents the number of sample contributions used to calculate the gradients for one synchronized optimizer update. It is computed as the product between the individual batch size (the one entering _make_dataloader()) and the total number of processes.

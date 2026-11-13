@@ -80,7 +80,7 @@ def discretize(values, p1, p99, n_bins=N_BINS):
     values = values.reshape(-1, values.shape[-1] if values.ndim > 1 else 1)
     discretized = np.zeros_like(values, dtype=np.int64)
     for d in range(values.shape[1]):
-        edges = np.linspace(p1[d], p99[d], n_bins + 1)
+        edges = np.linspace(p1[d], p99[d], n_bins + 1) # equally spaced bins. Attention: it creates class imbalance.
         discretized[:, d] = np.clip(np.digitize(values[:, d], edges[1:-1], right=True), 0, n_bins - 1)
     return discretized.squeeze()
 
@@ -111,6 +111,89 @@ def apply_discretization(data, metadata, n_bins=N_BINS):
                 s[key] = d.squeeze()
         data_discretized.extend(batch_disc)
     return data_discretized, action_percentiles
+
+
+
+def compute_action_class_weights(
+    train_loader,
+    n_bins=32,
+    n_actions=6,
+    max_weight=2.0
+):
+    """
+    Computes square-root inverse-frequency class weights from the
+    original training samples, without iterating through the DataLoader.
+
+    Supports the SharedMemoryRobotDataset and regular Subset datasets.
+    In DDP, every rank has the same training subset, so no all_reduce
+    is necessary.
+    """
+
+    dataset = train_loader.dataset
+
+    # Extract the underlying dataset and training indices.
+    if isinstance(dataset, Subset):
+        base_dataset = dataset.dataset
+        indices = torch.as_tensor(dataset.indices, dtype=torch.long)
+    else:
+        base_dataset = dataset
+        indices = None
+
+    # Direct access to the action tensor in SharedMemoryRobotDataset.
+    if hasattr(base_dataset, "actions") and isinstance(
+        base_dataset.actions, torch.Tensor
+    ):
+        if indices is not None:
+            targets = base_dataset.actions.index_select(0, indices)
+        else:
+            targets = base_dataset.actions
+
+    else:
+        # Fallback for regular Python datasets.
+        targets = torch.as_tensor(
+            np.stack([
+                dataset[i]["actions"]
+                for i in range(len(dataset))
+            ])
+        )
+
+    targets = targets.reshape(-1, n_actions).long().cpu()
+
+    if torch.any((targets < 0) | (targets >= n_bins)):
+        raise ValueError(
+            f"Action targets must be in [0, {n_bins - 1}]"
+        )
+
+    # Count occurrences of each bin for every action dimension.
+    bin_counts = torch.stack([
+        torch.bincount(targets[:, d], minlength=n_bins)
+        for d in range(n_actions)
+    ])
+
+    # Calculate square-root inverse-frequency weights.
+    class_weights = torch.zeros(
+        n_actions, n_bins, dtype=torch.float32
+    )
+
+    for d in range(n_actions):
+        observed = bin_counts[d] > 0
+
+        if not observed.any():
+            continue
+        
+        frequencies = bin_counts[d, observed].float() #bin_counts[d] contains the number of occurrences of each of the 32 bins for action dimension d. observed is a boolean mask identifying bins that occur at least once.
+
+        alpha = 0.25 # control the strength of class weighting.
+        weights = (
+            frequencies.mean() / frequencies
+        ).pow(alpha) # take the average frequency across all 32 bins (i.e., classes). Calculate the weight of the class by dividing the actual frequency of each of them.
+
+        weights = weights.clamp(max=max_weight)
+
+        class_weights[d, observed] = weights
+
+    return class_weights, bin_counts
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
