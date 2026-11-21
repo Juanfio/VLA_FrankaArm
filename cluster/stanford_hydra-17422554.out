@@ -1,0 +1,141 @@
+JOB START: Fri Nov 20 14:34:53 CET 2026
+JOB ID: 17422554
+CPUs: 32
+DDP processes: 1
+OMP threads: 32
+Modules loaded: Fri Nov 20 14:36:10 CET 2026
+Environment activated: Fri Nov 20 14:36:16 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Fri Nov 20 14:36:17 CET 2026
+Batch size=256 (global 256), Rank=0, Local_rank=0, World_size=1, CPUs=32, OMP_THREADS=32, Available_CPUs=32, PyTorch threads: 32
+
+n_episodes: 40
+Total samples: 26794
+3 unique instructions
+Preprocessing time: 12.73 min
+Vision-only Model
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+Encoder features cached: 8.87 min
+epoch   0 | train 3.1020/0.1166 | val 2.9246/0.1480 | lr 4.00e-05 | 0.06 min
+epoch   1 | train 2.8779/0.1531 | val 2.8729/0.1495 | lr 1.30e-04 | 0.04 min
+epoch   2 | train 2.7921/0.1696 | val 2.8374/0.1546 | lr 3.67e-04 | 0.12 min
+epoch   3 | train 2.7207/0.1815 | val 2.7993/0.1570 | lr 6.62e-04 | 0.17 min
+epoch   4 | train 2.6372/0.1971 | val 2.8071/0.1568 | lr 9.03e-04 | 0.11 min
+epoch   5 | train 2.5702/0.2085 | val 2.7931/0.1520 | lr 1.00e-03 | 0.09 min
+epoch   6 | train 2.5133/0.2198 | val 2.7953/0.1618 | lr 1.00e-03 | 0.06 min
+epoch   7 | train 2.4612/0.2329 | val 2.7737/0.1619 | lr 9.99e-04 | 0.05 min
+epoch   8 | train 2.4052/0.2448 | val 2.8067/0.1575 | lr 9.98e-04 | 0.11 min
+epoch   9 | train 2.3768/0.2529 | val 2.7937/0.1547 | lr 9.96e-04 | 0.25 min
+epoch  10 | train 2.3379/0.2620 | val 2.8090/0.1542 | lr 9.93e-04 | 0.03 min
+epoch  11 | train 2.2955/0.2735 | val 2.8150/0.1518 | lr 9.91e-04 | 0.03 min
+epoch  12 | train 2.2678/0.2809 | val 2.8450/0.1547 | lr 9.87e-04 | 0.04 min
+epoch  13 | train 2.2312/0.2884 | val 2.8631/0.1542 | lr 9.83e-04 | 0.20 min
+epoch  14 | train 2.2013/0.2957 | val 2.8741/0.1485 | lr 9.79e-04 | 0.06 min
+epoch  15 | train 2.1667/0.3066 | val 2.8750/0.1568 | lr 9.74e-04 | 0.17 min
+epoch  16 | train 2.1424/0.3113 | val 2.9122/0.1569 | lr 9.68e-04 | 0.28 min
+epoch  17 | train 2.1182/0.3179 | val 2.9281/0.1453 | lr 9.62e-04 | 0.26 min
+epoch  18 | train 2.0953/0.3260 | val 2.9371/0.1554 | lr 9.56e-04 | 0.05 min
+epoch  19 | train 2.0666/0.3306 | val 2.9789/0.1502 | lr 9.49e-04 | 0.04 min
+epoch  20 | train 2.0443/0.3369 | val 2.9996/0.1465 | lr 9.41e-04 | 0.04 min
+epoch  21 | train 2.0225/0.3444 | val 2.9899/0.1453 | lr 9.33e-04 | 0.03 min
+epoch  22 | train 1.9975/0.3502 | val 3.0212/0.1445 | lr 9.25e-04 | 0.04 min
+epoch  23 | train 1.9799/0.3562 | val 3.0204/0.1470 | lr 9.16e-04 | 0.03 min
+epoch  24 | train 1.9548/0.3631 | val 3.0460/0.1450 | lr 9.07e-04 | 0.04 min
+epoch  25 | train 1.9423/0.3672 | val 3.0964/0.1417 | lr 8.97e-04 | 0.12 min
+epoch  26 | train 1.9100/0.3762 | val 3.1017/0.1432 | lr 8.87e-04 | 0.03 min
+epoch  27 | train 1.8997/0.3794 | val 3.1039/0.1421 | lr 8.76e-04 | 0.07 min
+epoch  28 | train 1.8817/0.3844 | val 3.1238/0.1486 | lr 8.65e-04 | 0.05 min
+epoch  29 | train 1.8673/0.3891 | val 3.1586/0.1441 | lr 8.54e-04 | 0.03 min
+epoch  30 | train 1.8412/0.3963 | val 3.1512/0.1438 | lr 8.42e-04 | 0.04 min
+epoch  31 | train 1.8300/0.4001 | val 3.1887/0.1415 | lr 8.30e-04 | 0.03 min
+epoch  32 | train 1.8220/0.4004 | val 3.1889/0.1364 | lr 8.18e-04 | 0.05 min
+epoch  33 | train 1.8002/0.4073 | val 3.2248/0.1403 | lr 8.05e-04 | 0.03 min
+epoch  34 | train 1.7833/0.4121 | val 3.2336/0.1381 | lr 7.92e-04 | 0.20 min
+epoch  35 | train 1.7685/0.4171 | val 3.2567/0.1419 | lr 7.78e-04 | 0.03 min
+epoch  36 | train 1.7667/0.4153 | val 3.2653/0.1399 | lr 7.64e-04 | 0.34 min
+epoch  37 | train 1.7469/0.4236 | val 3.2668/0.1409 | lr 7.50e-04 | 0.03 min
+epoch  38 | train 1.7248/0.4285 | val 3.3122/0.1397 | lr 7.36e-04 | 0.07 min
+epoch  39 | train 1.7244/0.4288 | val 3.3170/0.1423 | lr 7.21e-04 | 0.03 min
+epoch  40 | train 1.7093/0.4351 | val 3.3456/0.1391 | lr 7.07e-04 | 0.13 min
+epoch  41 | train 1.6892/0.4404 | val 3.3613/0.1366 | lr 6.92e-04 | 0.04 min
+epoch  42 | train 1.6793/0.4436 | val 3.3646/0.1390 | lr 6.76e-04 | 0.13 min
+epoch  43 | train 1.6748/0.4439 | val 3.3899/0.1437 | lr 6.61e-04 | 0.05 min
+epoch  44 | train 1.6608/0.4507 | val 3.4036/0.1401 | lr 6.45e-04 | 0.09 min
+epoch  45 | train 1.6411/0.4566 | val 3.4156/0.1407 | lr 6.30e-04 | 0.04 min
+epoch  46 | train 1.6463/0.4536 | val 3.3973/0.1389 | lr 6.14e-04 | 0.04 min
+epoch  47 | train 1.6271/0.4611 | val 3.4204/0.1396 | lr 5.98e-04 | 0.37 min
+epoch  48 | train 1.6255/0.4598 | val 3.4618/0.1412 | lr 5.82e-04 | 0.03 min
+epoch  49 | train 1.6132/0.4639 | val 3.4566/0.1395 | lr 5.66e-04 | 0.03 min
+epoch  50 | train 1.5971/0.4707 | val 3.4619/0.1347 | lr 5.49e-04 | 0.03 min
+epoch  51 | train 1.5812/0.4748 | val 3.4730/0.1300 | lr 5.33e-04 | 0.04 min
+epoch  52 | train 1.5830/0.4720 | val 3.5047/0.1400 | lr 5.17e-04 | 0.05 min
+epoch  53 | train 1.5730/0.4765 | val 3.5098/0.1330 | lr 5.00e-04 | 0.03 min
+epoch  54 | train 1.5644/0.4789 | val 3.5207/0.1362 | lr 4.84e-04 | 0.03 min
+epoch  55 | train 1.5545/0.4821 | val 3.5352/0.1360 | lr 4.68e-04 | 0.10 min
+epoch  56 | train 1.5417/0.4883 | val 3.5314/0.1300 | lr 4.51e-04 | 0.07 min
+epoch  57 | train 1.5400/0.4871 | val 3.5608/0.1378 | lr 4.35e-04 | 0.09 min
+epoch  58 | train 1.5350/0.4911 | val 3.5595/0.1381 | lr 4.19e-04 | 0.12 min
+epoch  59 | train 1.5216/0.4944 | val 3.5864/0.1342 | lr 4.03e-04 | 0.04 min
+epoch  60 | train 1.5226/0.4933 | val 3.5826/0.1324 | lr 3.87e-04 | 0.04 min
+epoch  61 | train 1.5145/0.4968 | val 3.5805/0.1380 | lr 3.71e-04 | 0.03 min
+epoch  62 | train 1.5078/0.4983 | val 3.5862/0.1366 | lr 3.55e-04 | 0.03 min
+epoch  63 | train 1.5011/0.4999 | val 3.5962/0.1361 | lr 3.39e-04 | 0.04 min
+epoch  64 | train 1.4998/0.5013 | val 3.6042/0.1377 | lr 3.24e-04 | 0.03 min
+epoch  65 | train 1.4911/0.5036 | val 3.6157/0.1334 | lr 3.09e-04 | 0.13 min
+epoch  66 | train 1.4786/0.5092 | val 3.6329/0.1371 | lr 2.94e-04 | 0.10 min
+epoch  67 | train 1.4753/0.5123 | val 3.6239/0.1350 | lr 2.79e-04 | 0.03 min
+epoch  68 | train 1.4719/0.5114 | val 3.6442/0.1340 | lr 2.64e-04 | 0.09 min
+epoch  69 | train 1.4751/0.5115 | val 3.6492/0.1364 | lr 2.50e-04 | 0.05 min
+epoch  70 | train 1.4631/0.5155 | val 3.6499/0.1302 | lr 2.36e-04 | 0.05 min
+epoch  71 | train 1.4604/0.5148 | val 3.6727/0.1372 | lr 2.22e-04 | 0.03 min
+epoch  72 | train 1.4537/0.5194 | val 3.6509/0.1346 | lr 2.09e-04 | 0.03 min
+epoch  73 | train 1.4513/0.5196 | val 3.6757/0.1385 | lr 1.96e-04 | 0.12 min
+epoch  74 | train 1.4472/0.5193 | val 3.6720/0.1359 | lr 1.83e-04 | 0.04 min
+epoch  75 | train 1.4460/0.5221 | val 3.6677/0.1357 | lr 1.70e-04 | 0.05 min
+epoch  76 | train 1.4416/0.5223 | val 3.6784/0.1357 | lr 1.58e-04 | 0.05 min
+epoch  77 | train 1.4361/0.5243 | val 3.6785/0.1338 | lr 1.46e-04 | 0.19 min
+epoch  78 | train 1.4336/0.5273 | val 3.6741/0.1351 | lr 1.35e-04 | 0.03 min
+epoch  79 | train 1.4328/0.5277 | val 3.6794/0.1327 | lr 1.24e-04 | 0.18 min
+epoch  80 | train 1.4261/0.5303 | val 3.6802/0.1348 | lr 1.14e-04 | 0.04 min
+epoch  81 | train 1.4291/0.5283 | val 3.6871/0.1331 | lr 1.03e-04 | 0.05 min
+epoch  82 | train 1.4161/0.5355 | val 3.6909/0.1349 | lr 9.36e-05 | 0.12 min
+epoch  83 | train 1.4246/0.5303 | val 3.6862/0.1318 | lr 8.43e-05 | 0.08 min
+epoch  84 | train 1.4251/0.5314 | val 3.6882/0.1319 | lr 7.54e-05 | 0.03 min
+epoch  85 | train 1.4176/0.5322 | val 3.7023/0.1360 | lr 6.70e-05 | 0.03 min
+epoch  86 | train 1.4171/0.5343 | val 3.6991/0.1344 | lr 5.90e-05 | 0.04 min
+epoch  87 | train 1.4171/0.5345 | val 3.6874/0.1332 | lr 5.15e-05 | 0.03 min
+epoch  88 | train 1.4161/0.5341 | val 3.6972/0.1343 | lr 4.45e-05 | 0.03 min
+epoch  89 | train 1.4147/0.5356 | val 3.6952/0.1342 | lr 3.80e-05 | 0.03 min
+epoch  90 | train 1.4148/0.5338 | val 3.7004/0.1325 | lr 3.20e-05 | 0.04 min
+epoch  91 | train 1.4131/0.5337 | val 3.6997/0.1321 | lr 2.65e-05 | 0.15 min
+epoch  92 | train 1.4098/0.5348 | val 3.6990/0.1331 | lr 2.15e-05 | 0.03 min
+epoch  93 | train 1.4059/0.5376 | val 3.7004/0.1342 | lr 1.70e-05 | 0.03 min
+epoch  94 | train 1.3980/0.5405 | val 3.7015/0.1337 | lr 1.30e-05 | 0.03 min
+epoch  95 | train 1.4069/0.5372 | val 3.6976/0.1333 | lr 9.59e-06 | 0.03 min
+epoch  96 | train 1.4074/0.5381 | val 3.6987/0.1334 | lr 6.66e-06 | 0.03 min
+epoch  97 | train 1.4130/0.5367 | val 3.6997/0.1334 | lr 4.26e-06 | 0.03 min
+epoch  98 | train 1.4102/0.5378 | val 3.7001/0.1338 | lr 2.40e-06 | 0.18 min
+epoch  99 | train 1.4170/0.5330 | val 3.6998/0.1330 | lr 1.06e-06 | 0.03 min
+epoch 100 | train 1.4089/0.5361 | val 3.6998/0.1330 | lr 2.66e-07 | 0.03 min
+Running action-bin diagnostics...
+Action 0: accuracy=0.099, majority baseline=0.138, accuracy within 1 bin=0.290, majority baseline within 1 bin=0.301, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=14
+Action 1: accuracy=0.119, majority baseline=0.122, accuracy within 1 bin=0.344, majority baseline within 1 bin=0.306, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=16
+Action 2: accuracy=0.128, majority baseline=0.122, accuracy within 1 bin=0.319, majority baseline within 1 bin=0.272, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=15
+Action 3: accuracy=0.110, majority baseline=0.120, accuracy within 1 bin=0.307, majority baseline within 1 bin=0.302, unique predicted bins=31, unique target bins=32, target bin coverage=0.969, most common predicted bin=15
+Action 4: accuracy=0.183, majority baseline=0.201, accuracy within 1 bin=0.438, majority baseline within 1 bin=0.473, unique predicted bins=26, unique target bins=29, target bin coverage=0.862, most common predicted bin=19
+Action 5: accuracy=0.161, majority baseline=0.198, accuracy within 1 bin=0.419, majority baseline within 1 bin=0.502, unique predicted bins=30, unique target bins=32, target bin coverage=0.938, most common predicted bin=13
+============ Job Information ===================================================
+Submitted: 2026-11-20T14:34:46
+Started: 2026-11-20T14:34:47
+Ended: 2026-11-20T15:09:22
+Elapsed: 35 min, Limit: 1440 min, Difference: 1405 min
+CPUs: 32, Nodes: 1
+Estimated credit Consumption: 9.33 core-hours
+================================================================================

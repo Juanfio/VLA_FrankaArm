@@ -2,9 +2,9 @@
 
 ## Recipes (read first)
 - https://arxiv.org/abs/2502.19645v1  (OpenVLA-OFT: fine-tuning recipe)
-- https://openvla-oft.github.io
+- https://github.com/moojink/openvla-oft
 - https://arxiv.org/abs/2406.09246v3  (OpenVLA)
-- https://github.com/lovecode1/openvla
+- https://github.com/openvla/openvla
 
 ## Surveys
 - https://arxiv.org/abs/2510.24795v2  (Efficient VLAs)

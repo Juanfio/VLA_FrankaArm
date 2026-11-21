@@ -1,0 +1,420 @@
+JOB START: Fri Nov 20 12:40:49 CET 2026
+JOB ID: 17419904
+CPUs: 128
+DDP processes: 32
+OMP threads: 4
+Modules loaded: Fri Nov 20 12:40:52 CET 2026
+Environment activated: Fri Nov 20 12:40:53 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Fri Nov 20 12:40:53 CET 2026
+Batch size=64, Rank=4, Local_rank=4, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128, Batch size=64, Rank=27, Local_rank=27, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,   Batch size=64, Rank=0, Local_rank=0, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128, PyTorch threads: 4
+PyTorch threads: 4
+ 
+
+PyTorch threads: 4
+
+Batch size=64, Rank=5, Local_rank=5, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=6, Local_rank=6, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=2, Local_rank=2, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=7, Local_rank=7, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=3, Local_rank=3, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=1, Local_rank=1, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=8, Local_rank=8, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=11, Local_rank=11, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=14, Local_rank=14, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=13, Local_rank=13, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=20, Local_rank=20, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=16, Local_rank=16, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=9, Local_rank=9, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=17, Local_rank=17, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=15, Local_rank=15, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=19, Local_rank=19, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=12, Local_rank=12, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=22, Local_rank=22, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=21, Local_rank=21, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=24, Local_rank=24, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=10, Local_rank=10, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=26, Local_rank=26, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=25, Local_rank=25, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=18, Local_rank=18, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=31, Local_rank=31, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=28, Local_rank=28, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  Batch size=64, Rank=23, Local_rank=23, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128, PyTorch threads: 4
+ 
+PyTorch threads: 4
+
+Batch size=64, Rank=29, Local_rank=29, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+Batch size=64, Rank=30, Local_rank=30, World_size=32, CPUs=128, OMP_THREADS=4, Available_CPUs=128,  PyTorch threads: 4
+
+n_episodes: 40
+Total samples: 26794
+3 unique instructions
+Preprocessed data saved to preprocessed_data/preprocessed_dataset.pt
+Preprocessing time: 10.43 min
+
+===== ACTION CLASS WEIGHTS =====
+Action 0: observed bins=32/32, min weight=0.696, max weight=1.625
+Action 1: observed bins=32/32, min weight=0.692, max weight=1.443
+Action 2: observed bins=32/32, min weight=0.707, max weight=1.510
+Action 3: observed bins=32/32, min weight=0.686, max weight=1.984
+Action 4: observed bins=32/32, min weight=0.627, max weight=2.000
+Action 5: observed bins=32/32, min weight=0.641, max weight=2.000
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only ModelVision-only ModelVision-only ModelVision-only Model
+
+
+
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Vision-only ModelVision-only Model
+
+Vision-only ModelVision-only Model
+
+Vision-only Model
+Vision-only Model
+Vision-only Model
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+epoch   0 | train 3.5059/0.0638 | val 3.3507/0.0980
+Training + validation time: 3.87 min
+epoch   1 | train 3.2973/0.1225 | val 3.2535/0.1416
+Training + validation time: 1.53 min
+epoch   2 | train 3.2433/0.1439 | val 3.2324/0.1386
+Training + validation time: 1.50 min
+epoch   3 | train 3.2185/0.1452 | val 3.2196/0.1398
+Training + validation time: 1.49 min
+epoch   4 | train 3.2002/0.1493 | val 3.2094/0.1416
+Training + validation time: 1.49 min
+epoch   5 | train 3.1838/0.1526 | val 3.2003/0.1414
+Training + validation time: 1.53 min
+epoch   6 | train 3.1683/0.1562 | val 3.1922/0.1436
+Training + validation time: 1.53 min
+epoch   7 | train 3.1535/0.1600 | val 3.1848/0.1447
+Training + validation time: 1.51 min
+epoch   8 | train 3.1394/0.1638 | val 3.1780/0.1472
+Training + validation time: 1.54 min
+epoch   9 | train 3.1259/0.1669 | val 3.1716/0.1474
+Training + validation time: 1.51 min
+epoch  10 | train 3.1132/0.1699 | val 3.1657/0.1484
+Training + validation time: 1.50 min
+epoch  11 | train 3.1011/0.1721 | val 3.1604/0.1482
+Training + validation time: 1.49 min
+epoch  12 | train 3.0897/0.1744 | val 3.1555/0.1499
+Training + validation time: 1.55 min
+epoch  13 | train 3.0788/0.1769 | val 3.1511/0.1511
+Training + validation time: 1.48 min
+epoch  14 | train 3.0684/0.1783 | val 3.1471/0.1521
+Training + validation time: 1.54 min
+epoch  15 | train 3.0585/0.1801 | val 3.1434/0.1537
+Training + validation time: 1.55 min
+epoch  16 | train 3.0489/0.1818 | val 3.1400/0.1538
+Training + validation time: 1.51 min
+epoch  17 | train 3.0398/0.1833 | val 3.1369/0.1540
+Training + validation time: 1.56 min
+epoch  18 | train 3.0309/0.1853 | val 3.1340/0.1538
+Training + validation time: 1.52 min
+epoch  19 | train 3.0223/0.1873 | val 3.1313/0.1539
+Training + validation time: 1.53 min
+epoch  20 | train 3.0140/0.1891 | val 3.1287/0.1534
+Training + validation time: 1.51 min
+epoch  21 | train 3.0060/0.1909 | val 3.1264/0.1537
+Training + validation time: 1.55 min
+epoch  22 | train 2.9982/0.1928 | val 3.1242/0.1536
+Training + validation time: 1.55 min
+epoch  23 | train 2.9906/0.1944 | val 3.1222/0.1546
+Training + validation time: 1.50 min
+epoch  24 | train 2.9832/0.1963 | val 3.1203/0.1551
+Training + validation time: 1.52 min
+epoch  25 | train 2.9760/0.1982 | val 3.1186/0.1562
+Training + validation time: 1.52 min
+epoch  26 | train 2.9690/0.1998 | val 3.1169/0.1565
+Training + validation time: 1.54 min
+epoch  27 | train 2.9621/0.2013 | val 3.1154/0.1569
+Training + validation time: 1.55 min
+epoch  28 | train 2.9554/0.2029 | val 3.1140/0.1573
+Training + validation time: 1.53 min
+epoch  29 | train 2.9488/0.2049 | val 3.1127/0.1575
+Training + validation time: 1.53 min
+epoch  30 | train 2.9424/0.2065 | val 3.1114/0.1571
+Training + validation time: 1.52 min
+Running action-bin diagnostics...
+Action 0: accuracy=0.137, majority baseline=0.139, unique predicted bins=24, unique target bins=32, target bin coverage=0.750, most common predicted bin=14
+Action 1: accuracy=0.141, majority baseline=0.123, unique predicted bins=25, unique target bins=32, target bin coverage=0.781, most common predicted bin=16
+Action 2: accuracy=0.128, majority baseline=0.123, unique predicted bins=24, unique target bins=32, target bin coverage=0.750, most common predicted bin=15
+Action 3: accuracy=0.134, majority baseline=0.120, unique predicted bins=21, unique target bins=32, target bin coverage=0.656, most common predicted bin=15
+Action 4: accuracy=0.203, majority baseline=0.201, unique predicted bins=14, unique target bins=29, target bin coverage=0.448, most common predicted bin=19
+Action 5: accuracy=0.200, majority baseline=0.198, unique predicted bins=18, unique target bins=32, target bin coverage=0.562, most common predicted bin=13
+============ Job Information ===================================================
+Submitted: 2026-11-20T12:40:44
+Started: 2026-11-20T12:40:45
+Ended: 2026-11-20T13:43:47
+Elapsed: 64 min, Limit: 1440 min, Difference: 1376 min
+CPUs: 128, Nodes: 1
+Estimated credit Consumption: 68.27 core-hours
+================================================================================

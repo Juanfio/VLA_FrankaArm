@@ -1,29 +1,15 @@
 import os
 import time
+from functools import partial
 
-# def debug_log(message):
-#     print(
-#         f"[{time.strftime('%H:%M:%S')}] "
-#         f"PID={os.getpid()} "
-#         f"RANK={os.environ.get('RANK', '?')} "
-#         f"{message}",
-#         flush=True
-#     )
-
-# debug_log("Starting train.py")
-
-
-# debug_log("Importing models")
-from .models import VisionTransformer, ActionHead, RoboticActionModel
-# debug_log("Importing preprocessing")
-from preprocessing.preprocessing import get_dataloaders_oxe, compute_action_class_weights
-# debug_log("Importing settings")
+from .models import VisionTransformer, DinoV2Encoder, ActionHead, RoboticActionModel
+from preprocessing.preprocessing import get_dataloaders_oxe, compute_action_class_weights, make_fixed_overfit_loaders
 from preprocessing.utils import get_settings
 
-# debug_log("Other imports")
 import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import OneCycleLR
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -34,233 +20,167 @@ import h5py
 from datetime import timedelta
 
 N_BINS = 32
-BATCH_SIZE = 64
 HYDRA = "stanford_hydra_dataset_converted_externally_to_rlds"
 
 
 def get_model(parameters: dict):
     use_lang = parameters.get("use_lang", False)
     lang_dim = parameters.get("lang_dim", 384) if use_lang else 0
-    embed_dim = parameters["embed_dim"]
+    encoder = parameters.get("encoder", "vit")  # "vit" (from scratch) or a DINOv2 hub name
+    dropout = parameters.get("dropout", 0.0)    # inside the scratch ViT and on the action head's input
 
-    vit = VisionTransformer(
-        img_size=parameters["img_size"], patch_size=parameters["patch_size"],
-        in_channels=parameters["in_channels"], embed_dim=embed_dim,
-        num_layers=parameters["num_layers"], num_heads=parameters["num_heads"],
-        mlp_dim=parameters["mlp_dim"], dropout=parameters["dropout"],
-        use_lang=use_lang, lang_dim=lang_dim,
-    )
+    if encoder.startswith("dinov2"):
+        vit = DinoV2Encoder(model_name=encoder, freeze=parameters.get("freeze_encoder", True),
+                            pooling=parameters.get("pooling", "cls"), use_lang=use_lang)
+        embed_dim = vit.embed_dim  # set by the backbone, not by the config
+    else:
+        embed_dim = parameters["embed_dim"]
+        vit = VisionTransformer(
+            img_size=parameters["img_size"], patch_size=parameters["patch_size"],
+            in_channels=parameters["in_channels"], embed_dim=embed_dim,
+            num_layers=parameters["num_layers"], num_heads=parameters["num_heads"],
+            mlp_dim=parameters["mlp_dim"], dropout=dropout,
+            use_lang=use_lang, lang_dim=lang_dim,
+        )
 
-    head = ActionHead(embed_dim=embed_dim, action_dim=6, use_lang=use_lang, lang_dim=lang_dim)
-
+    head = ActionHead(embed_dim=embed_dim, action_dim=6, use_lang=use_lang, lang_dim=lang_dim, dropout=dropout)
     return RoboticActionModel(vit, {HYDRA: head})
 
 
-def action_ce_loss(logits, targets, class_weights=None):
-    losses = []
-
-    for d in range(targets.shape[1]):
-        weights = (
-            class_weights[d] if class_weights is not None else None
-        )
-
-        loss = F.cross_entropy(
-            logits[:, d, :],
-            targets[:, d],
-            weight=weights,
-            label_smoothing=0.05
-        )
-
-        losses.append(loss)
-
-    return torch.stack(losses).mean()
+def action_ce_loss(logits, targets, class_weights=None, label_smoothing=0.0):
+    """Cross-entropy averaged over the action dimensions, with optional per-dimension class weights."""
+    return torch.stack([
+        F.cross_entropy(logits[:, d, :], targets[:, d], label_smoothing=label_smoothing,
+                        weight=None if class_weights is None else class_weights[d])
+        for d in range(targets.shape[1])
+    ]).mean()
 
 
 def action_accuracy(logits, targets):
     return (logits.argmax(dim=-1) == targets).float().mean().item()
 
 
-def run_one_epoch(model, loader, device, optimizer=None, use_ddp=False, class_weights=None):
+def run_one_epoch(model, loader, device, loss_fn, optimizer=None, scheduler=None):
+    """One pass over the loader, training when an optimizer is given. Returns (mean loss, mean accuracy)."""
     is_train = optimizer is not None
     model.train(is_train)
-
-    base = model.module if use_ddp else model
-    use_lang = base.vit.use_lang
-
+    use_lang = getattr(model, "module", model).vit.use_lang  # unwrap DDP
     total_loss, total_acc, total_samples = 0.0, 0.0, 0
 
     with torch.set_grad_enabled(is_train):
         for batch in loader:
-            if is_train:
-                optimizer.zero_grad()
-
-            images = batch["image"].to(device)
+            images = batch["image"].to(device)  # images, or the cached features of a frozen encoder
             language = batch["language_embedding"].to(device) if use_lang else None
             targets = batch["actions"].to(device).long()
             dataset_names = batch["dataset_name"]
 
             batch_loss, batch_n = 0.0, 0
-            for dataset_name in set(dataset_names):
-                mask = torch.tensor([n == dataset_name for n in dataset_names], device=device)
-                idx = mask.nonzero(as_tuple=True)[0]
-
-                logits = model(
-                    images[idx],
-                    language[idx] if language is not None else None,
-                    dataset_name=dataset_name
-                )
-                loss = action_ce_loss(logits, targets[idx], class_weights)
-                acc = action_accuracy(logits, targets[idx])
-
+            for dataset_name in set(dataset_names):  # one action head per dataset
+                idx = torch.tensor([n == dataset_name for n in dataset_names], device=device).nonzero(as_tuple=True)[0]
+                logits = model(images[idx], language[idx] if language is not None else None, dataset_name=dataset_name)
+                loss = loss_fn(logits, targets[idx])
                 b = len(idx)
                 batch_loss += loss * b
                 batch_n += b
                 total_loss += loss.item() * b
-                total_acc += acc * b
+                total_acc += action_accuracy(logits, targets[idx]) * b
                 total_samples += b
 
-            batch_loss /= batch_n
             if is_train:
-                batch_loss.backward()
+                optimizer.zero_grad()
+                (batch_loss / batch_n).backward()
                 optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()  # the learning rate changes every batch
 
     return total_loss / total_samples, total_acc / total_samples
 
 
-def train_one_epoch(model, loader, device, optimizer, use_ddp=False, class_weights=None):
-    return run_one_epoch(model, loader, device, optimizer, use_ddp, class_weights)
-
-
 @torch.no_grad()
-def evaluate(model, loader, device, use_ddp=False, class_weights=None):
-    return run_one_epoch(model, loader, device, None, use_ddp, class_weights)
-
-@torch.no_grad()
-def diagnose_action_bins(model, loader, device):
+def diagnose_action_bins(model, loader, device, n_actions=6, n_bins=N_BINS):
     # TODO: MOVE THIS FUNCTION TO PREPROCESSING.UTILS -> It's for diagnosing not training.
     """
-    Checks whether the model predicts only a subset of the action bins
-    present in the target distribution. Aggregates statistics across
-    all DDP processes when distributed training is enabled.
+    Checks whether the model predicts only a subset of the action bins present in the targets, and compares
+    exact and ±1-bin accuracy with the best constant prediction (majority baselines). A ±1-bin hit counts
+    neighbouring bins as correct. Aggregates statistics across all DDP processes.
     """
     is_ddp = dist.is_available() and dist.is_initialized()
-    rank = dist.get_rank() if is_ddp else 0
-
-    # Access the underlying model to avoid DDP forward synchronization
-    # during evaluation.
-    base_model = model.module if isinstance(model, DDP) else model
+    base_model = getattr(model, "module", model)  # avoids DDP forward synchronization during evaluation
     base_model.eval()
 
-    n_actions = 6
-    n_bins = N_BINS
-
-    # Accumulate integer counts locally on each process.
+    # Integer counts, accumulated locally on each process.
     target_counts = torch.zeros(n_actions, n_bins, dtype=torch.long)
     pred_counts = torch.zeros(n_actions, n_bins, dtype=torch.long)
-    correct = torch.zeros(n_actions, dtype=torch.long)
+    correct = torch.zeros(2, n_actions, dtype=torch.long)  # rows: exact bin, within ±1 bin
 
     for batch in loader:
-        images = batch["image"].to(device)
-        targets = batch["actions"].to(device).long()
-
-        language = (
-            batch["language_embedding"].to(device)
-            if base_model.vit.use_lang else None
-        )
-
-        dataset_names = batch["dataset_name"]
-
-        for dataset_name in set(dataset_names):
-            idx = torch.tensor(
-                [n == dataset_name for n in dataset_names],
-                device=device
-            ).nonzero(as_tuple=True)[0]
-
-            logits = base_model(
-                images[idx],
-                language[idx] if language is not None else None,
-                dataset_name=dataset_name
-            )
-
-            predictions = logits.argmax(dim=-1)
-
-            t = targets[idx].cpu()
-            p = predictions.cpu()
-
+        language = batch["language_embedding"] if base_model.vit.use_lang else None
+        for dataset_name in set(batch["dataset_name"]):
+            idx = torch.tensor([n == dataset_name for n in batch["dataset_name"]]).nonzero(as_tuple=True)[0]
+            logits = base_model(batch["image"][idx].to(device),
+                                language[idx].to(device) if language is not None else None,
+                                dataset_name=dataset_name)
+            p, t = logits.argmax(dim=-1).cpu(), batch["actions"][idx].long()
+            error = (p - t).abs()
+            correct += torch.stack([(error == 0).sum(0), (error <= 1).sum(0)])
             for d in range(n_actions):
-                target_counts[d] += torch.bincount(
-                    t[:, d], minlength=n_bins
-                )
-                pred_counts[d] += torch.bincount(
-                    p[:, d], minlength=n_bins
-                )
-                correct[d] += (p[:, d] == t[:, d]).sum()
+                target_counts[d] += torch.bincount(t[:, d], minlength=n_bins)
+                pred_counts[d] += torch.bincount(p[:, d], minlength=n_bins)
 
-    # Aggregate raw statistics across all processes.
-    if is_ddp:
-        stats = torch.cat([
-            target_counts.flatten(),
-            pred_counts.flatten(),
-            correct
-        ])
-
-        # NCCL requires CUDA tensors; Gloo can use CPU tensors.
-        stats_device = (
-            device if dist.get_backend() == "nccl"
-            else torch.device("cpu")
-        )
-
-        stats = stats.to(stats_device)
-        dist.all_reduce(stats, op=dist.ReduceOp.SUM)
-        stats = stats.cpu()
-
+    if is_ddp:  # sum the raw counts of all processes (NCCL requires CUDA tensors; Gloo can use CPU tensors)
         size = n_actions * n_bins
-        target_counts = stats[:size].reshape(n_actions, n_bins)
-        pred_counts = stats[size:2 * size].reshape(n_actions, n_bins)
-        correct = stats[2 * size:]
+        stats = torch.cat([target_counts.flatten(), pred_counts.flatten(), correct.flatten()])
+        stats = stats.to(device if dist.get_backend() == "nccl" else "cpu")
+        dist.all_reduce(stats, op=dist.ReduceOp.SUM)
+        target_counts, pred_counts, correct = stats.cpu().split([size, size, 2 * n_actions])
+        target_counts, pred_counts = target_counts.view(n_actions, n_bins), pred_counts.view(n_actions, n_bins)
+        correct = correct.view(2, n_actions)
 
     # Calculate metrics using globally aggregated counts.
     results = {}
-
     for d in range(n_actions):
         total = target_counts[d].sum().item()
-
         if total == 0:
             continue
-
-        accuracy = correct[d].item() / total
-        majority = target_counts[d].max().item() / total
-        unique_preds = (pred_counts[d] > 0).sum().item()
-        most_common = pred_counts[d].argmax().item()
-
-        unique_targets = (target_counts[d] > 0).sum().item()
-
-        covered_target_bins = (
-            (pred_counts[d] > 0) &
-            (target_counts[d] > 0)
-        ).sum().item()
-
-        target_bin_coverage = covered_target_bins / unique_targets
-
+        predicted, present = pred_counts[d] > 0, target_counts[d] > 0
+        padded = F.pad(target_counts[d], (1, 1))
         results[d] = {
-            "accuracy": accuracy,
-            "majority_baseline": majority,
-            "unique_predicted_bins": unique_preds,
-            "most_common_predicted_bin": most_common
+            "accuracy": correct[0, d].item() / total,
+            "majority_baseline": target_counts[d].max().item() / total,
+            "accuracy_within_1_bin": correct[1, d].item() / total,
+            "majority_baseline_within_1_bin": (padded[:-2] + padded[1:-1] + padded[2:]).max().item() / total,
+            "unique_predicted_bins": predicted.sum().item(),  # how many different bins were predicted
+            "unique_target_bins": present.sum().item(),  # how many different bins could have been predicted
+            "target_bin_coverage": (predicted & present).sum().item() / present.sum().item(),  # fraction predicted
+            "most_common_predicted_bin": pred_counts[d].argmax().item(),
         }
-
-        if rank == 0:
-            print(
-                f"Action {d}: "
-                f"accuracy={accuracy:.3f}, "
-                f"majority baseline={majority:.3f}, "
-                f"unique predicted bins={unique_preds}, " # how many different bins were predicted.
-                f"unique target bins={unique_targets}, " # how many different bins could have been predicted. 
-                f"target bin coverage={target_bin_coverage:.3f}, " # percentage of predicted bins from the total set.
-                f"most common predicted bin={most_common}"
-            )
-
+        if not is_ddp or dist.get_rank() == 0:
+            print(f"Action {d}: " + ", ".join(f"{k.replace('_', ' ')}={v:.3f}" if isinstance(v, float)
+                                              else f"{k.replace('_', ' ')}={v}" for k, v in results[d].items()),
+                  flush=True)
     return results
+
+
+@torch.no_grad()
+def cache_frozen_features(encoder, dataset, device, batch_size=256):
+    """
+    Replace the dataset's images by the features of the frozen encoder. Without fine-tuning or augmentation
+    they never change, so encoding every frame once replaces running the encoder in every epoch.
+    Under DDP every process encodes every world_size-th frame, then the processes exchange their parts.
+    """
+    is_ddp = dist.is_available() and dist.is_initialized()
+    rank, world = (dist.get_rank(), dist.get_world_size()) if is_ddp else (0, 1)
+    idx = torch.arange(rank, len(dataset.images), world)
+    feats = torch.cat([encoder(dataset.images[idx[i:i + batch_size]].to(device)).cpu()
+                       for i in range(0, len(idx), batch_size)])
+    if world > 1:
+        parts = [None] * world
+        dist.all_gather_object(parts, feats)
+        feats = torch.empty(len(dataset.images), feats.shape[1])
+        for r, part in enumerate(parts):
+            feats[r::world] = part
+    dataset.images = feats
+
 
 def setup_distributed_training():
 
@@ -285,12 +205,16 @@ def cleanup_distributed_training():
     if dist.is_initialized():
         dist.destroy_process_group()
 
-def train(model, train_loader, val_loader, device, model_filename,
-          num_epochs, lr, local_rank, world_size, use_ddp, class_weights=None):
 
+def train(model, train_loader, val_loader, device, settings, num_epochs, world_size, use_ddp, class_weights=None):
+    """
+    Train with AdamW, log per-epoch metrics, optionally save the best checkpoint (and resume from it).
+    Config keys: learning_rate, weight_decay, label_smoothing, save_checkpoint, model_filename, and
+    lr_schedule: "cosine" warms up over the first warmup_frac of all steps, then decays; otherwise constant.
+    """
     parent = Path(__file__).resolve().parent.parent / "data"
-    ckpt_path = parent / f"best_model_{model_filename}.pt"
-    metrics_path = parent / f"metrics_epoch_{model_filename}.pt"
+    ckpt_path = parent / f"best_model_{settings['model_filename']}.pt"
+    metrics_path = parent / f"metrics_epoch_{settings['model_filename']}.pt"
     rank = dist.get_rank() if use_ddp else 0
 
     model = model.to(device)
@@ -298,7 +222,13 @@ def train(model, train_loader, val_loader, device, model_filename,
     if use_ddp: model = DDP(model, device_ids=None, output_device=None)
 
     base_model = model.module if use_ddp else model
-    optimizer = AdamW(base_model.parameters(), lr=lr, betas=(0.9, 0.999), weight_decay=0.01)
+    loss_fn = partial(action_ce_loss, class_weights=class_weights, label_smoothing=settings.get("label_smoothing", 0.0))
+    lr = settings["learning_rate"]
+    optimizer = AdamW(base_model.parameters(), lr=lr, betas=(0.9, 0.999), weight_decay=settings.get("weight_decay", 0.01))
+    scheduler = None
+    if settings.get("lr_schedule") == "cosine":  # epochs run from 0 to num_epochs inclusive
+        scheduler = OneCycleLR(optimizer, max_lr=lr, total_steps=(num_epochs + 1) * len(train_loader),
+                               pct_start=settings.get("warmup_frac", 0.05), cycle_momentum=False)
 
     best_val_loss, start_epoch = float("inf"), 0
     metrics = {k: np.array([]) for k in
@@ -307,10 +237,10 @@ def train(model, train_loader, val_loader, device, model_filename,
     # Resume
     if ckpt_path.is_file():
         ckpt = torch.load(ckpt_path, map_location=device)
-        state = {k.removeprefix("module."): v
-                 for k, v in ckpt["model_state_dict"].items()}
-        base_model.load_state_dict(state)
+        base_model.load_state_dict({k.removeprefix("module."): v for k, v in ckpt["model_state_dict"].items()})
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        if scheduler is not None and ckpt.get("scheduler_state_dict"):
+            scheduler.load_state_dict(ckpt["scheduler_state_dict"])
         start_epoch = ckpt["epoch"] + 1
         best_val_loss = ckpt.get("val_loss", float("inf"))
 
@@ -331,9 +261,12 @@ def train(model, train_loader, val_loader, device, model_filename,
     # Training
     for epoch in range(start_epoch, num_epochs + 1):
         t_epoch = time.perf_counter()
+        if hasattr(train_loader.sampler, "set_epoch"):
+            train_loader.sampler.set_epoch(epoch)  # draw a different random set of training samples every epoch
+        epoch_lr = optimizer.param_groups[0]["lr"]
 
-        tl, ta = train_one_epoch(model, train_loader, device, optimizer, use_ddp, class_weights)
-        vl, va = evaluate(model, val_loader, device, use_ddp, class_weights)
+        tl, ta = run_one_epoch(model, train_loader, device, loss_fn, optimizer, scheduler)
+        vl, va = run_one_epoch(model, val_loader, device, loss_fn)
 
         if use_ddp:
             vals = torch.tensor([tl, ta, vl, va], dtype=torch.float64,
@@ -342,29 +275,21 @@ def train(model, train_loader, val_loader, device, model_filename,
             tl, ta, vl, va = (vals / world_size).tolist()
 
         if rank == 0:
-            print(f"epoch {epoch:3d} | train {tl:.4f}/{ta:.4f} | val {vl:.4f}/{va:.4f}",
-                  flush=True)
-            print(
-                f"Training + validation time: "
-                f"{(time.perf_counter() - t_epoch)/60:.2f} min",
-                flush=True
-            )
+            print(f"epoch {epoch:3d} | train {tl:.4f}/{ta:.4f} | val {vl:.4f}/{va:.4f} | lr {epoch_lr:.2e} | "
+                  f"{(time.perf_counter() - t_epoch) / 60:.2f} min", flush=True)
 
         for k, v in zip(metrics, [tl, ta, vl, va]):
             metrics[k] = np.append(metrics[k], v)
 
-        # Uncomment when using training with checkpoint saving.
-        # if rank == 0 and vl < best_val_loss:
-        #     best_val_loss = vl
-        #     tmp_path = ckpt_path.with_suffix(".tmp")
-        #     torch.save({
-        #         "epoch": epoch,
-        #         "model_state_dict": base_model.state_dict(),
-        #         "optimizer_state_dict": optimizer.state_dict(),
-        #         "val_loss": best_val_loss
-        #     }, tmp_path)
-        #     os.replace(tmp_path, ckpt_path)
-        #     print(f" -> saved best checkpoint ({vl:.4f})", flush=True)
+        if settings.get("save_checkpoint", False) and rank == 0 and vl < best_val_loss:
+            best_val_loss = vl
+            tmp_path = ckpt_path.with_suffix(".tmp")
+            torch.save({"epoch": epoch, "model_state_dict": base_model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "scheduler_state_dict": scheduler.state_dict() if scheduler is not None else None,
+                        "val_loss": best_val_loss}, tmp_path)
+            os.replace(tmp_path, ckpt_path)
+            print(f" -> saved best checkpoint ({vl:.4f})", flush=True)
 
     # Save metrics only on global rank 0
     if rank == 0:
@@ -378,8 +303,6 @@ def train(model, train_loader, val_loader, device, model_filename,
     return model, metrics
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--settings", type=str)
@@ -389,86 +312,74 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # ─────────────────────────────────────────────────────────────────────────────
-    # Initialize DDP
+    # Initialize DDP & open settings.
     # ─────────────────────────────────────────────────────────────────────────────
-    local_rank, world_size = 0, 1
-    if args.use_ddp:
-        local_rank, world_size = setup_distributed_training()
-    print(
-    f"Batch size={BATCH_SIZE}, "
-    f"Rank={dist.get_rank()}, "
-    f"Local_rank={local_rank}, "
-    f"World_size={world_size}, "
-    f"CPUs={os.getenv('SLURM_CPUS_PER_TASK')}, "
-    f"OMP_THREADS={os.getenv('OMP_NUM_THREADS')}, "
-    f"Available_CPUs={len(os.sched_getaffinity(0))}, ",
-    f"PyTorch threads: {torch.get_num_threads()}\n",
-    flush=True
-    )
-
-    # ─────────────────────────────────────────────────────────────────────────────
-    # Open settings & prepare data.
-    # ─────────────────────────────────────────────────────────────────────────────
+    local_rank, world_size = setup_distributed_training() if args.use_ddp else (0, 1)
+    rank = dist.get_rank() if args.use_ddp else 0
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{args.settings}"))
-    torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))
+    batch_size = settings.get("batch_size", 64)  # per process: the global batch is batch_size * world_size
+    print(f"Batch size={batch_size} (global {batch_size * world_size}), Rank={rank}, Local_rank={local_rank}, "
+          f"World_size={world_size}, CPUs={os.getenv('SLURM_CPUS_PER_TASK')}, "
+          f"OMP_THREADS={os.getenv('OMP_NUM_THREADS')}, Available_CPUs={len(os.sched_getaffinity(0))}, "
+          f"PyTorch threads: {torch.get_num_threads()}\n", flush=True)
+    torch.set_num_threads(int(os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())))
     torch.set_num_interop_threads(1)
 
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Prepare data & model.
+    # ─────────────────────────────────────────────────────────────────────────────
     t0 = time.perf_counter() # keep track of time taken by preprocessing and training.
     train_loader, val_loader, lang_dim = get_dataloaders_oxe(
         cfg=args.settings, n_bins=N_BINS,
         keys_to_keep=settings["keys_to_keep"],
         renaming_keys=settings["renaming_keys"],
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
         data_name_lst=settings["data_name_lst"],
         use_ddp=args.use_ddp,
         local_rank=local_rank,
         world_size=world_size,
         preprocessed_path=args.preprocessed_path,
     )
-
-    # Calculate action class weights from the training dataset.
-    # All DDP processes must execute this function.
-    class_weights, train_bin_counts = compute_action_class_weights(
-        train_loader,
-        n_bins=N_BINS,
-        n_actions=6
-    )
-
-    # Print the global bin distributions and weights on rank 0 only.
-    if not args.use_ddp or dist.get_rank() == 0:
-        print(f"Preprocessing time: {(time.perf_counter()-t0)/60:.2f} min", flush=True)
-        print("\n===== ACTION CLASS WEIGHTS =====")
-
-        for d in range(6):
-            print(
-                f"Action {d}: "
-                f"observed bins={(train_bin_counts[d] > 0).sum().item()}/32, "
-                f"min weight={class_weights[d][train_bin_counts[d] > 0].min():.3f}, "
-                f"max weight={class_weights[d].max():.3f}"
-            )
+    if rank == 0: print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min", flush=True)
 
     parameters = settings["model_parameters"]
     parameters["lang_dim"] = lang_dim
     parameters["use_lang"] = parameters.get("use_lang", False)
-
-    print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model")
-
+    if rank == 0: print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model", flush=True)
     model = get_model(parameters)
     device = torch.device(f"cuda:{local_rank}" if args.use_ddp and torch.cuda.is_available() else "cpu")
+
+    # A frozen encoder gives the same features in every epoch: compute them once, then train only the head.
+    # Must run before the loaders are iterated (their persistent workers keep the dataset they start with).
+    if isinstance(model.vit, DinoV2Encoder) and model.vit.freeze:
+        t0 = time.perf_counter()
+        cache_frozen_features(model.vit.to(device), train_loader.dataset.dataset, device)
+        if rank == 0: print(f"Encoder features cached: {(time.perf_counter() - t0) / 60:.2f} min", flush=True)
+
+    # Memorization sanity check: train and evaluate on the same few fixed training samples.
+    if settings.get("overfit_samples"):
+        train_loader, val_loader = make_fixed_overfit_loaders(
+            train_loader, n_samples=settings["overfit_samples"], batch_size=16, seed=42)
+
+    # Class weights from the training targets (all DDP processes must execute this function).
+    class_weights = None
+    if settings.get("class_weights", False):
+        class_weights, train_bin_counts = compute_action_class_weights(train_loader, n_bins=N_BINS, n_actions=6)
+        if rank == 0:
+            print("\n===== ACTION CLASS WEIGHTS =====")
+            for d in range(6):
+                observed = train_bin_counts[d] > 0
+                print(f"Action {d}: observed bins={observed.sum().item()}/{N_BINS}, "
+                      f"min weight={class_weights[d][observed].min():.3f}, max weight={class_weights[d].max():.3f}")
 
     # ─────────────────────────────────────────────────────────────────────────────
     # Train model
     # ─────────────────────────────────────────────────────────────────────────────
-    model, metrics = train(
-        model, train_loader, val_loader, device,
-        settings["model_filename"], args.n_epochs,
-        settings["learning_rate"], local_rank,
-        world_size, args.use_ddp,
-        class_weights=class_weights
-    )
+    model, metrics = train(model, train_loader, val_loader, device, settings, args.n_epochs,
+                           world_size, args.use_ddp, class_weights=class_weights)
 
     # Diagnose action-bin distributions across all validation shards.
-    if not args.use_ddp or dist.get_rank() == 0: print("Running action-bin diagnostics...", flush=True)
+    if rank == 0: print("Running action-bin diagnostics...", flush=True)
     diagnose_action_bins(model, val_loader, device)
 
     if args.use_ddp:

@@ -1,9 +1,9 @@
 {
     "data_name_lst": [
         "stanford_hydra_dataset_converted_externally_to_rlds"
-    ],    
+    ],
     "path_data": "./data",
-    
+
     "oxe_dataset_name": "stanford_hydra_taco_play_40-episodes",
     "data_name_sim": "sim_demos.hdf5",
 
@@ -19,6 +19,9 @@
 
     "renaming_keys": {},
     "model_parameters":{
+        "encoder": "dinov2_vits14",
+        "freeze_encoder": true,
+        "pooling": "cls",
         "img_size": 224,
         "patch_size": 16,
         "in_channels": 3,
@@ -26,10 +29,18 @@
         "num_layers": 3,
         "num_heads": 3,
         "mlp_dim": 512,
-        "dropout": 0.1,
+        "dropout": 0.0,
         "use_lang": false
     },
 
-    "learning_rate" : 1e-4,
-    "model_filename": "stanford_hydra-40_episodes-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim"
+    "batch_size": 256,
+    "learning_rate": 1e-3,
+    "lr_schedule": "cosine",
+    "warmup_frac": 0.05,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.0,
+    "class_weights": false,
+    "overfit_samples": 0,
+    "save_checkpoint": false,
+    "model_filename": "stanford_hydra-40_episodes-dinov2_vits14-frozen-cls-cosine_lr1e-3-bs256"
 }

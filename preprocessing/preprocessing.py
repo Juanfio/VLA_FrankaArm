@@ -1,37 +1,18 @@
-# import os
-# import time
-
-# _import_start = time.perf_counter()
-
-# def import_log(message):
-#     rank = os.environ.get("RANK", "?")
-#     elapsed = time.perf_counter() - _import_start
-
-#     print(
-#         f"[Preprocessing import][Rank {rank}] "
-#         f"{message} ({elapsed:.2f}s)",
-#         flush=True
-#     )
-
-# import_log("Starting preprocessing imports")
-
-# import_log("Importing torch")
 import torch
 
-# import_log("Importing torch.utils.data")
-from torch.utils.data import Dataset, DataLoader, Subset, WeightedRandomSampler
+from torch.utils.data import Dataset, DataLoader, Subset
 
-# import_log("Importing preprocessing.utils")
 from preprocessing.utils import get_settings
 
-# import_log("Importing json/pathlib/numpy")
 import json
 from pathlib import Path
 import numpy as np
 
-# import_log("Preprocessing imports completed")
 
 N_BINS = 32
+# Normalization constants DINOv2 was pretrained with (ImageNet RGB statistics).
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-MiniLM-L6-v2"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -114,84 +95,32 @@ def apply_discretization(data, metadata, n_bins=N_BINS):
 
 
 
-def compute_action_class_weights(
-    train_loader,
-    n_bins=32,
-    n_actions=6,
-    max_weight=2.0
-):
+def compute_action_class_weights(train_loader, n_bins=32, n_actions=6, max_weight=2.0, alpha=0.25):
     """
-    Computes square-root inverse-frequency class weights from the
-    original training samples, without iterating through the DataLoader.
-
-    Supports the SharedMemoryRobotDataset and regular Subset datasets.
-    In DDP, every rank has the same training subset, so no all_reduce
-    is necessary.
+    Inverse-frequency class weights from the training targets, without iterating through the DataLoader:
+    per action dimension, (mean bin frequency / bin frequency) ** alpha clamped at max_weight
+    (alpha=0.5 is the square root, larger alpha weights rare bins more); bins that never occur get 0.
+    Supports SharedMemoryRobotDataset and regular Subset datasets. In DDP, every rank has the same
+    training subset, so no all_reduce is necessary. Returns (class_weights, bin_counts), both (n_actions, n_bins).
     """
-
     dataset = train_loader.dataset
-
-    # Extract the underlying dataset and training indices.
-    if isinstance(dataset, Subset):
-        base_dataset = dataset.dataset
-        indices = torch.as_tensor(dataset.indices, dtype=torch.long)
-    else:
-        base_dataset = dataset
-        indices = None
-
-    # Direct access to the action tensor in SharedMemoryRobotDataset.
-    if hasattr(base_dataset, "actions") and isinstance(
-        base_dataset.actions, torch.Tensor
-    ):
-        if indices is not None:
-            targets = base_dataset.actions.index_select(0, indices)
-        else:
-            targets = base_dataset.actions
-
-    else:
-        # Fallback for regular Python datasets.
-        targets = torch.as_tensor(
-            np.stack([
-                dataset[i]["actions"]
-                for i in range(len(dataset))
-            ])
-        )
-
+    base = dataset.dataset if isinstance(dataset, Subset) else dataset
+    if isinstance(getattr(base, "actions", None), torch.Tensor):  # direct access in SharedMemoryRobotDataset
+        targets = base.actions if base is dataset else base.actions.index_select(
+            0, torch.as_tensor(dataset.indices, dtype=torch.long))
+    else:  # fallback for regular Python datasets
+        targets = torch.as_tensor(np.stack([dataset[i]["actions"] for i in range(len(dataset))]))
     targets = targets.reshape(-1, n_actions).long().cpu()
-
     if torch.any((targets < 0) | (targets >= n_bins)):
-        raise ValueError(
-            f"Action targets must be in [0, {n_bins - 1}]"
-        )
+        raise ValueError(f"Action targets must be in [0, {n_bins - 1}]")
 
-    # Count occurrences of each bin for every action dimension.
-    bin_counts = torch.stack([
-        torch.bincount(targets[:, d], minlength=n_bins)
-        for d in range(n_actions)
-    ])
-
-    # Calculate square-root inverse-frequency weights.
-    class_weights = torch.zeros(
-        n_actions, n_bins, dtype=torch.float32
-    )
-
+    bin_counts = torch.stack([torch.bincount(targets[:, d], minlength=n_bins) for d in range(n_actions)])
+    class_weights = torch.zeros(n_actions, n_bins, dtype=torch.float32)
     for d in range(n_actions):
-        observed = bin_counts[d] > 0
-
-        if not observed.any():
-            continue
-        
-        frequencies = bin_counts[d, observed].float() #bin_counts[d] contains the number of occurrences of each of the 32 bins for action dimension d. observed is a boolean mask identifying bins that occur at least once.
-
-        alpha = 0.25 # control the strength of class weighting.
-        weights = (
-            frequencies.mean() / frequencies
-        ).pow(alpha) # take the average frequency across all 32 bins (i.e., classes). Calculate the weight of the class by dividing the actual frequency of each of them.
-
-        weights = weights.clamp(max=max_weight)
-
-        class_weights[d, observed] = weights
-
+        observed = bin_counts[d] > 0  # bins that occur at least once
+        if observed.any():
+            frequencies = bin_counts[d, observed].float()
+            class_weights[d, observed] = (frequencies.mean() / frequencies).pow(alpha).clamp(max=max_weight)
     return class_weights, bin_counts
 
 
@@ -226,22 +155,30 @@ def episode_to_ids(dataset):
     return episode_to_indices
 
 
-def image_resizing(data, out_dim=224, mean=None, std=None):
+def image_resizing(data, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
+    """
+    Resize images to out_dim x out_dim and normalize them per channel. By default with the fixed ImageNet
+    mean/std, which the pretrained DINOv2 encoder expects and which are also available at rollout time.
+    mean=None and std=None restore the old behaviour (statistics per (dataset, episode)): that only suits the
+    from-scratch ViT and cannot be reproduced at rollout, where the episode's statistics are unknown in advance.
+    """
     from torchvision import transforms
     import torchvision.transforms.functional as TF
 
-    """Resize and normalize images, computing stats per (dataset, episode) by default."""
-    ep_to_idx = episode_to_ids(data)
-    for (ds_name, ep_idx), indices in ep_to_idx.items():
+    if (mean is None) != (std is None):
+        raise ValueError("Pass both mean and std, or neither (per-episode statistics).")
+    resize = transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR)
+
+    if mean is not None:
+        for s in data:
+            s["image"] = TF.normalize(resize(TF.to_tensor(s["image"])), mean, std)
+        return data
+
+    for indices in episode_to_ids(data).values():
         stack = torch.stack([TF.to_tensor(data[i]["image"]) for i in indices])
-        ep_mean = mean if mean is not None else stack.mean(dim=[0, 2, 3])
-        ep_std = std if std is not None else stack.std(dim=[0, 2, 3]).clamp(min=1e-6)
-        transform = transforms.Compose([
-            transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR),
-            transforms.Normalize(ep_mean, ep_std)
-        ])
+        ep_mean, ep_std = stack.mean(dim=[0, 2, 3]), stack.std(dim=[0, 2, 3]).clamp(min=1e-6)
         for i, img in zip(indices, stack):
-            data[i]["image"] = transform(img)
+            data[i]["image"] = TF.normalize(resize(img), ep_mean, ep_std)
     return data
 
 
@@ -282,104 +219,50 @@ def add_language_embeddings(data, model_name="all-MiniLM-L6-v2", out_key="langua
 # ─────────────────────────────────────────────────────────────────────────────
 def split_by_episode(dataset, val_frac=0.1, seed=42):
     """
-    Split episodes into train/validation sets.
-
-    For SharedMemoryRobotDataset, use NumPy operations to avoid
-    constructing large Python dictionaries and lists.
+    Split whole episodes into train/validation sets (val_frac of the episodes, at least one in each set).
+    For SharedMemoryRobotDataset, NumPy operations avoid constructing large Python dictionaries and lists.
 
     Returns:
-        train_idx, val_idx: NumPy arrays for SharedMemoryRobotDataset,
-                            Python lists otherwise.
+        train_idx, val_idx: NumPy arrays for SharedMemoryRobotDataset, Python lists otherwise.
     """
-
     if not 0.0 < val_frac < 1.0:
         raise ValueError("val_frac must be between 0 and 1.")
-
     rng = np.random.default_rng(seed)
 
     if isinstance(dataset, SharedMemoryRobotDataset):
-
-        # Access the underlying CPU tensors as NumPy views (no data copy).
-        ds = dataset.dataset_ids.numpy()
-        ep = dataset.episode_indices.numpy()
-
+        ds, ep = dataset.dataset_ids.numpy(), dataset.episode_indices.numpy()  # NumPy views (no data copy)
         if len(ds) == 0:
             raise ValueError("Cannot split an empty dataset.")
-
-        # Encode (dataset_id, episode_id) into unique integer keys.
-        # Episode IDs are nonnegative and restart for each dataset.
-        base = int(ep.max()) + 1
-        episode_keys = ds * base + ep
-
-        # Identify unique episodes and map every sample to its episode.
-        unique_keys, inverse = np.unique(episode_keys, return_inverse=True)
-
-        n_episodes = len(unique_keys)
-
-        if n_episodes < 2:
-            raise ValueError(
-                "At least two episodes are required for a train/validation split."
-            )
-
-        # Randomly select validation episodes.
-        perm = rng.permutation(n_episodes)
-
-        n_val = max(1, int(val_frac * n_episodes))
-        n_val = min(n_val, n_episodes - 1)
-
-        val_episodes = perm[:n_val]
-
-        # Create a boolean lookup table for validation episodes.
-        val_episode_mask = np.zeros(n_episodes, dtype=bool)
-        val_episode_mask[val_episodes] = True
-
-        # Assign every sample to train or validation.
-        val_mask = val_episode_mask[inverse]
-
-        train_idx = np.flatnonzero(~val_mask)
-        val_idx = np.flatnonzero(val_mask)
-        return train_idx, val_idx
-
+        # Map every sample to its episode via unique (dataset_id, episode_id) keys (episode IDs restart per dataset).
+        unique_keys, sample_episode = np.unique(ds * (int(ep.max()) + 1) + ep, return_inverse=True)
+        episodes = range(len(unique_keys))
     else:
-        # Original implementation for regular Python datasets.
         ep_to_idx = episode_to_ids(dataset)
+        episodes = sorted(ep_to_idx.keys())
 
-        ep_ids = sorted(ep_to_idx.keys())
+    if len(episodes) < 2:
+        raise ValueError("At least two episodes are required for a train/validation split.")
+    n_val = min(max(1, int(val_frac * len(episodes))), len(episodes) - 1)
+    order = rng.permutation(len(episodes))  # random episode order: the first n_val episodes validate
 
-        if len(ep_ids) < 2:
-            raise ValueError(
-                "At least two episodes are required for a train/validation split."
-            )
-
-        rng.shuffle(ep_ids)
-
-        n_val = max(1, int(val_frac * len(ep_ids)))
-        n_val = min(n_val, len(ep_ids) - 1)
-
-        val_eps = set(ep_ids[:n_val])
-        train_eps = ep_ids[n_val:]
-
-        train_idx = [i for ep in train_eps for i in ep_to_idx[ep]]
-        val_idx = [i for ep in val_eps for i in ep_to_idx[ep]]
-        return train_idx, val_idx
+    if isinstance(dataset, SharedMemoryRobotDataset):
+        val_mask = np.isin(sample_episode, order[:n_val])
+        return np.flatnonzero(~val_mask), np.flatnonzero(val_mask)
+    shuffled = [episodes[i] for i in order]
+    return ([i for e in shuffled[n_val:] for i in ep_to_idx[e]],
+            [i for e in shuffled[:n_val] for i in ep_to_idx[e]])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data Loaders
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_weights(subset, metadata, scale=150):
-    """Compute sample weights for weighted sampling (1/n_samples per dataset)."""
-    dw = {n: scale / m["total_samples"] for n, m in metadata.items()}
-    return [dw[subset.dataset[i]["dataset_name"]] for i in subset.indices]
-
-
 def worker_init_fn(worker_id):
     torch.set_num_threads(1)
 
 
 class SharedMemoryRobotDataset(Dataset):
-    """Dataset backed by shared memory tensors for DDP."""
+    """Dataset backed by tensors, memory-mapped from disk when several DDP processes share them."""
 
     def __init__(self, shared_data, indices=None):
         self.__dict__.update(shared_data)
@@ -431,155 +314,96 @@ class DistributedWeightedSampler:
 def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=None,
                         batch_size=32, data_name_lst=None, use_ddp=False,
                         local_rank=0, world_size=1, preprocessed_path=None):
-    """Build OXE dataloaders with optional DDP and preprocessed data support."""
+    """
+    Build OXE train/val dataloaders, single-process or DDP. Only global rank 0 preprocesses. A single process
+    keeps the result in memory; with several processes, or when preprocessed_path is given, it is written to
+    disk and memory-mapped by every process. An existing preprocessed_path is reused instead of preprocessing.
+    """
     import torch.distributed as dist
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
     oxe_name, path_data = settings["oxe_dataset_name"], settings["path_data"]
     if data_name_lst is None: data_name_lst = settings.get("data_name_lst")
     keys_to_keep = keys_to_keep or settings["keys_to_keep"]
     renaming_keys = renaming_keys or settings["renaming_keys"]
+    rank = dist.get_rank() if use_ddp else 0
+    dataset_path = Path(preprocessed_path or "./preprocessed_data/preprocessed_dataset.pt")
 
-    if use_ddp:
-
-        rank = dist.get_rank()
-
-        dataset_path = (
-            Path(preprocessed_path)
-            if preprocessed_path
-            else Path("./preprocessed_data/preprocessed_dataset.pt")
-        )
-
-        # Only global rank 0 preprocesses
-        if rank == 0:
-
-            # Reuse an existing preprocessed file when explicitly provided
-            use_existing = preprocessed_path is not None and dataset_path.exists()
-
-            if not use_existing:
-
-                data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst)
-
-                print(f"Total samples: {len(data)}", flush=True)
-
-                data, action_pct = apply_discretization(data, metadata, n_bins)
-                data = filter_keys(data, keys_to_keep, renaming_keys)
-                data = image_resizing(data)
-                data, lang_dim, _ = add_language_embeddings(data)
-                shared = _build_shared_data(data, metadata)
-                payload = {
-                    **shared,
-                    "metadata": metadata,
-                    "action_percentiles": action_pct,
-                    "lang_dim": lang_dim
-                }
-
-                dataset_path.parent.mkdir(parents=True, exist_ok=True)
-                torch.save(payload, dataset_path)
-                print(f"Preprocessed data saved to {dataset_path}", flush=True)
-
-                # Release preprocessing memory
-                import gc
-
-                del payload
-                del shared
-                del data
-                del metadata
-                del action_pct
-
-                gc.collect()
-
-        # Wait until rank 0 has finished writing
-        dist.barrier()
-
-        # Every rank loads the dataset using memory mapping
-        loaded = torch.load(
-            str(dataset_path),
-            map_location="cpu",
-            mmap=True,
-            weights_only=False
-        )
-
-        dataset = SharedMemoryRobotDataset(loaded)
-        lang_dim = loaded["lang_dim"]
-        train_idx, val_idx = split_by_episode(dataset)
-        train_loader = _make_dataloader(dataset, train_idx, world_size, rank, batch_size, True)
-        val_loader = _make_dataloader(dataset, val_idx, world_size, rank, batch_size, False)
-
-        return train_loader, val_loader, lang_dim
-    else:
-        # Single-process mode
+    loaded = None
+    if rank == 0 and not (preprocessed_path and dataset_path.exists()):
         data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst)
-        data, _ = apply_discretization(data, metadata, n_bins)
-        data = filter_keys(data, keys_to_keep, renaming_keys)
-        data = image_resizing(data)
+        print(f"Total samples: {len(data)}", flush=True)
+        data, action_pct = apply_discretization(data, metadata, n_bins)
+        data = image_resizing(filter_keys(data, keys_to_keep, renaming_keys))
         data, lang_dim, _ = add_language_embeddings(data)
-        train_idx, val_idx = split_by_episode(data)
-        train_set, val_set = Subset(data, train_idx), Subset(data, val_idx)
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=False, 
-                                    sampler=WeightedRandomSampler(
-                                        make_weights(train_set, metadata),
-                                        num_samples=len(train_set),
-                                        replacement=True
-                                    ), num_workers=2, worker_init_fn=worker_init_fn
-                                )
-        val_loader = DataLoader(val_set, batch_size, False, num_workers=2, worker_init_fn=worker_init_fn)
-        return train_loader, val_loader, lang_dim
+        loaded = {**_build_shared_data(data, metadata), "metadata": metadata, "action_percentiles": action_pct,
+                  "lang_dim": lang_dim, "image_normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD}}
+        del data  # release the per-sample copies
+        if world_size > 1 or preprocessed_path:
+            dataset_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(loaded, dataset_path)
+            print(f"Preprocessed data saved to {dataset_path}", flush=True)
+            loaded = None  # release memory: rank 0 memory-maps the file below, like every other rank
+    if use_ddp:
+        dist.barrier()  # wait until rank 0 has finished writing
+    if loaded is None:
+        loaded = torch.load(str(dataset_path), map_location="cpu", mmap=True, weights_only=False)
+
+    # Files written before the switch to fixed ImageNet normalization lack this key
+    # and hold per-episode-normalized images, which the DINOv2 encoder must not see.
+    norm = loaded.get("image_normalization")
+    if norm is None or tuple(norm["mean"]) != IMAGENET_MEAN or tuple(norm["std"]) != IMAGENET_STD:
+        raise ValueError(f"{dataset_path} was preprocessed with image normalization {norm}, expected mean "
+                         f"{IMAGENET_MEAN} and std {IMAGENET_STD}. Delete it or run without --preprocessed_path.")
+
+    dataset = SharedMemoryRobotDataset(loaded)
+    train_idx, val_idx = split_by_episode(dataset)
+    return (_make_dataloader(dataset, train_idx, world_size, rank, batch_size, True),
+            _make_dataloader(dataset, val_idx, world_size, rank, batch_size, False), loaded["lang_dim"])
+
 
 def _build_shared_data(data, metadata):
-    """Convert preprocessed data to shared memory tensors."""
-
-    N = len(data)
-
-    img_shape = data[0]["image"].shape
-    n_actions = data[0]["actions"].shape[0]
-    lang_dim = data[0]["language_embedding"].shape[0]
-
+    """Stack the preprocessed samples into tensors (shared by DDP processes through memory mapping)."""
     names = list(metadata.keys())
     name_to_id = {n: i for i, n in enumerate(names)}
-
-    images = torch.empty((N,) + img_shape, dtype=torch.float32)
-    actions = torch.empty((N, n_actions), dtype=torch.int64)
-    lang_emb = torch.empty((N, lang_dim), dtype=torch.float32)
-
-    ds_ids = torch.empty((N,), dtype=torch.int64)
-    ep_idx = torch.empty((N,), dtype=torch.int64)
-
-    for i, s in enumerate(data):
-        images[i] = s["image"]
-        actions[i] = torch.from_numpy(s["actions"])
-        lang_emb[i] = s["language_embedding"]
-
-        ds_ids[i] = name_to_id[s["dataset_name"]]
-        ep_idx[i] = s["episode_idx"]
-
     return {
-        "images": images,
-        "actions": actions,
-        "language_embeddings": lang_emb,
-        "dataset_ids": ds_ids,
-        "episode_indices": ep_idx,
+        "images": torch.stack([s["image"] for s in data]).float(),
+        "actions": torch.as_tensor(np.stack([s["actions"] for s in data]), dtype=torch.int64),
+        "language_embeddings": torch.stack([s["language_embedding"] for s in data]).float(),
+        "dataset_ids": torch.tensor([name_to_id[s["dataset_name"]] for s in data], dtype=torch.int64),
+        "episode_indices": torch.tensor([s["episode_idx"] for s in data], dtype=torch.int64),
         "dataset_names": names,
         "dataset_name_to_id": name_to_id
     }
 
 
 def _make_dataloader(dataset, indices, world_size, rank, batch_size, is_train):
-    """Create dataloader with appropriate sampler for DDP or single-process."""
+    """
+    Training: each process draws samples with replacement, weighted so every dataset is drawn equally often.
+    Validation: each process evaluates its own shard in a fixed order.
+    """
     subset = Subset(dataset, indices)
     if is_train:
         ids = dataset.dataset_ids[torch.as_tensor(indices, dtype=torch.long)]
-        counts = torch.bincount(ids,minlength=len(dataset.dataset_names)).clamp_min(1)
-        weights = counts[ids].double().reciprocal()
-        sampler = DistributedWeightedSampler(weights,len(indices) // world_size + 1,world_size,rank)
-        return DataLoader(subset, batch_size, sampler=sampler, num_workers=1,
-                          worker_init_fn=worker_init_fn, persistent_workers=True)
+        weights = torch.bincount(ids, minlength=len(dataset.dataset_names)).clamp_min(1)[ids].double().reciprocal()
+        sampler = DistributedWeightedSampler(weights, len(indices) // world_size + 1, world_size, rank)
     else:
-        from torch.utils.data.distributed import DistributedSampler as DDistSampler
-        sampler = DDistSampler(subset, world_size, rank, shuffle=False)
-        return DataLoader(subset, batch_size, sampler=sampler, num_workers=1,
-                          worker_init_fn=worker_init_fn, persistent_workers=True)
+        from torch.utils.data.distributed import DistributedSampler
+        sampler = DistributedSampler(subset, world_size, rank, shuffle=False)
+    return DataLoader(subset, batch_size, sampler=sampler, num_workers=1,
+                      worker_init_fn=worker_init_fn, persistent_workers=True)
 
 
+def make_fixed_overfit_loaders(train_loader, n_samples=128, batch_size=16, seed=42):
+    """
+    Loaders over the same n_samples training samples, chosen randomly but fixed by seed: shuffled for training
+    (every sample used once per epoch), in a fixed order for evaluation.
+    Used for testing whether the model is able to memorize a small dataset.
+    """
+    dataset = train_loader.dataset
+    indices = np.random.default_rng(seed).choice(len(dataset), size=min(n_samples, len(dataset)), replace=False)
+    fixed_dataset = Subset(dataset, indices.tolist())
+    return (DataLoader(fixed_dataset, batch_size=batch_size, shuffle=True, num_workers=0),
+            DataLoader(fixed_dataset, batch_size=batch_size, shuffle=False, num_workers=0))
 # ─────────────────────────────────────────────────────────────────────────────
 # Simulated Dataset
 # ─────────────────────────────────────────────────────────────────────────────
