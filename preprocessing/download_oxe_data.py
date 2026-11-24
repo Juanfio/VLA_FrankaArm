@@ -94,6 +94,7 @@ def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, oxe_
             dataset_grp = f.create_group(f"{data_name}")
 
             for i, episode in enumerate(dataset.take(n_episodes)):
+                print(f"Episode: {episode}")
                 grp_episode = dataset_grp.create_group(f"episode_{i}")
                 steps = list(episode["steps"])
 
