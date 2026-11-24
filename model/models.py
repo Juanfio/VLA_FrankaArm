@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 
@@ -173,75 +175,159 @@ def _load_dinov2(model_name: str) -> nn.Module:
 class DinoV2Encoder(nn.Module):
     """
     Pretrained DINOv2 image encoder (Oquab et al. 2023) with VisionTransformer's interface:
-    forward(images, lang) -> (B, embed_dim). Images must be ImageNet-normalized (DINOv2's pretraining
+    forward(images, lang) -> image representation. Images must be ImageNet-normalized (DINOv2's pretraining
     normalization) with sides divisible by the patch size 14 (224x224 -> 16x16 patches).
     Language is not injected into the backbone; with use_lang=True the ActionHead concatenates it.
 
-    pooling: "cls" -> CLS token, embed_dim = D; "cls_mean" -> CLS token + mean patch token,
-    embed_dim = 2D (the feature DINOv2 uses for its linear-probe evaluations).
+    pooling: "cls" -> CLS token, (B, D); "cls_mean" -> CLS token + mean patch token, (B, 2D) (the feature
+    DINOv2 uses for its linear-probe evaluations); "grid" -> CLS token followed by the patch tokens averaged
+    over a grid_size x grid_size grid, (B, 1 + grid_size**2, D), which keeps where things are in the image.
+
+    train_blocks: with freeze=True, the last train_blocks transformer blocks and the final LayerNorm still train
+    (partial fine-tuning). The frozen blocks before them then run once, in preprocessing (see cache_features).
     """
 
     def __init__(self, model_name: str = "dinov2_vits14", freeze: bool = True, pooling: str = "cls",
-                 use_lang: bool = False):
+                 use_lang: bool = False, grid_size: int = 4, train_blocks: int = 0):
         super().__init__()
-        if pooling not in ("cls", "cls_mean"):
-            raise ValueError(f"pooling must be 'cls' or 'cls_mean', got {pooling!r}")
+        if pooling not in ("cls", "cls_mean", "grid"):
+            raise ValueError(f"pooling must be 'cls', 'cls_mean' or 'grid', got {pooling!r}")
 
         self.backbone = _load_dinov2(model_name)
+        depth = len(self.backbone.blocks)                               # 12 for ViT-S/14
+        if not 0 <= train_blocks <= depth:
+            raise ValueError(f"train_blocks must be between 0 and {depth}, got {train_blocks}")
         self.model_name = model_name
         self.freeze = freeze
+        self.train_blocks = train_blocks if freeze else 0               # freeze=False trains every block
+        self.n_frozen = depth - train_blocks if freeze else 0           # blocks that never train
         self.pooling = pooling
+        self.grid_size = grid_size
+        # identifies its cached features in preprocessed files
+        self.name = (f"{model_name}-tokens_after_block{self.n_frozen}" if self.train_blocks
+                     else f"{model_name}-{pooling}" + (str(grid_size) if pooling == "grid" else ""))
         self.use_lang = use_lang
         self.patch_size = self.backbone.patch_size
         self.feature_dim = self.backbone.embed_dim                      # 384 for ViT-S/14
-        self.embed_dim = self.feature_dim * (2 if pooling == "cls_mean" else 1)
+        self.embed_dim = self.feature_dim * (2 if pooling == "cls_mean" else 1)  # size of each output vector
+        self.n_tokens = 1 + grid_size ** 2 if pooling == "grid" else 1  # output vectors per image
 
         if freeze:
             self.backbone.requires_grad_(False)
+            self.backbone.blocks[self.n_frozen:].requires_grad_(True)  # the last train_blocks blocks
+            self.backbone.norm.requires_grad_(self.train_blocks > 0)
             self.backbone.eval()
 
     def train(self, mode: bool = True):
-        # Keep a frozen backbone in eval mode even when the surrounding model trains.
+        # Keep the frozen part of the backbone in eval mode even when the surrounding model trains.
         super().train(mode)
         if self.freeze:
             self.backbone.eval()
+            self.backbone.blocks[self.n_frozen:].train(mode)
         return self
 
-    def forward(self, x: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
+    def _frozen_tokens(self, x: torch.Tensor) -> torch.Tensor:
         """
-        x: (B, 3, H, W) ImageNet-normalized images, H and W divisible by 14.
-        lang: ignored here (see class docstring).
-        Returns: (B, embed_dim) image representation.
+        Embeds images as patch tokens and runs them through the frozen blocks.
+
+            Args:
+                x: torch.Tensor
+                    (B, 3, H, W) ImageNet-normalized images, H and W divisible by the patch size 14.
+
+            Returns:
+                tokens: torch.Tensor
+                    (B, 1 + h*w, D) CLS and patch tokens after block n_frozen (all blocks when train_blocks=0).
         """
         H, W = x.shape[-2:]
         if H % self.patch_size or W % self.patch_size:
             raise ValueError(f"Image size {H}x{W} is not divisible by patch size {self.patch_size}")
-
-        # No activations are stored for backprop through a frozen backbone.
+        # No activations are stored for backprop through frozen weights.
         with torch.set_grad_enabled(torch.is_grad_enabled() and not self.freeze):
-            feats = self.backbone.forward_features(x)
+            x = self.backbone.prepare_tokens_with_masks(x)
+            for block in self.backbone.blocks[:self.n_frozen]:
+                x = block(x)
+        return x
 
-        cls_token = feats["x_norm_clstoken"]                            # (B, D)
+    @torch.no_grad()
+    def cache_features(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Computes what preprocessing stores per frame, so that training only runs the trainable part.
+
+            Args:
+                x: torch.Tensor
+                    (B, 3, H, W) ImageNet-normalized images, H and W divisible by the patch size 14.
+
+            Returns:
+                features: torch.Tensor
+                    The encoder output when every block is frozen (as forward). With train_blocks > 0, the tokens
+                    after the frozen blocks, (B, 1 + h*w, D) in float16 to halve memory.
+        """
+        return self._frozen_tokens(x).half() if self.train_blocks else self(x)
+
+    def forward(self, x: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        x: (B, 3, H, W) ImageNet-normalized images, H and W divisible by 14, or what cache_features returned.
+        lang: ignored here (see class docstring).
+        Returns: (B, embed_dim), or (B, n_tokens, embed_dim) for pooling="grid".
+        """
+        if x.dim() != 4 and not self.train_blocks:
+            return x                                                    # final features cached in preprocessing
+        hw = (x.shape[-2] // self.patch_size, x.shape[-1] // self.patch_size) if x.dim() == 4 else None
+        x = self._frozen_tokens(x) if x.dim() == 4 else x.float()       # (B, 1 + h*w, D)
+        for block in self.backbone.blocks[self.n_frozen:]:              # trainable blocks
+            x = block(x)
+        x = self.backbone.norm(x)
+
+        cls_token = x[:, 0]                                             # (B, D)
         if self.pooling == "cls":
             return cls_token
-        mean_patch = feats["x_norm_patchtokens"].mean(dim=1)            # (B, D)
-        return torch.cat([cls_token, mean_patch], dim=-1)               # (B, 2D)
+        patches = x[:, 1 + self.backbone.num_register_tokens:]          # (B, h*w, D), row by row
+        if self.pooling == "cls_mean":
+            return torch.cat([cls_token, patches.mean(dim=1)], dim=-1)  # (B, 2D)
+        B, N, D = patches.shape
+        h, w = hw or (math.isqrt(N),) * 2                               # cached tokens: square images
+        grid = patches.transpose(1, 2).reshape(B, D, h, w)
+        grid = nn.functional.adaptive_avg_pool2d(grid, self.grid_size).flatten(2).transpose(1, 2)  # (B, G*G, D)
+        return torch.cat([cls_token[:, None], grid], dim=1)             # (B, 1 + G*G, D)
+
+
+class AttentionPooling(nn.Module):
+    """
+    Pools tokens (B, T, D) into one vector (B, D): a learned query attends over the tokens, each tagged with a
+    learned position embedding, so the head can weight image regions by their relevance to the action.
+    """
+
+    def __init__(self, dim: int, n_tokens: int, dropout: float = 0.0):
+        super().__init__()
+        self.pos_embed = nn.Parameter(torch.zeros(1, n_tokens, dim))
+        self.query = nn.Parameter(torch.zeros(1, 1, dim))
+        self.norm = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads=max(1, dim // 64), dropout=dropout, batch_first=True)
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        nn.init.trunc_normal_(self.query, std=0.02)
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        x = self.norm(tokens + self.pos_embed)
+        pooled, _ = self.attn(self.query.expand(len(x), -1, -1), x, x, need_weights=False)
+        return pooled[:, 0]
 
 
 class ActionHead(nn.Module):
     """
     Small MLP head mapping the image representation (y) to per-dimension logits over the n_bins
     discretized action bins -- i.e. classification, not regression. Dropout acts on the image features.
+    With n_tokens > 1 (e.g. a grid of patch features), attention pooling first turns the tokens into one vector.
 
     Supports vision-only and vision-language fusion via concatenation.
     """
 
     def __init__(self, embed_dim: int, action_dim: int, n_bins: int = 32, hidden_dim: int = 512,
-                 use_lang: bool = False, lang_dim: int = 384, dropout: float = 0.0):
+                 use_lang: bool = False, lang_dim: int = 384, dropout: float = 0.0, n_tokens: int = 1):
         super().__init__()
         self.action_dim = action_dim
         self.n_bins = n_bins
         self.use_lang = use_lang
+        self.pool = AttentionPooling(embed_dim, n_tokens, dropout) if n_tokens > 1 else None
         self.dropout = nn.Dropout(dropout)  # outside self.mlp: keeps the checkpoints' parameter names
 
         # Input dimension: vision + (language if enabled)
@@ -254,7 +340,9 @@ class ActionHead(nn.Module):
         )
 
     def forward(self, y: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
-        # y: (B, D_vision) -> (B, action_dim, n_bins) logits, one softmax per action dim
+        # y: (B, D_vision) or (B, n_tokens, D_vision) -> (B, action_dim, n_bins) logits, one softmax per action dim
+        if self.pool is not None:
+            y = self.pool(y)
         x = self.dropout(y)
         if self.use_lang and lang is not None:  # concatenate the language embedding if enabled
             x = torch.cat([x, lang], dim=-1)  # (B, D_vision + D_lang)
@@ -286,6 +374,6 @@ class RoboticActionModel(nn.Module):
         self.action_heads = nn.ModuleDict(action_heads)
 
     def forward(self, images: torch.Tensor, lang: torch.Tensor, dataset_name: str) -> torch.Tensor:
-        # images: (B, 3, H, W), or (B, D) features of a frozen encoder computed beforehand (see train.py)
-        y = images if images.dim() == 2 else self.vit(images, lang)  # (B, D) shared image encoder
+        # images: (B, 3, H, W), or what a frozen DINOv2 encoder cached in preprocessing (it handles both)
+        y = self.vit(images, lang)                          # shared image encoder
         return self.action_heads[dataset_name](y, lang)     # (B, action_dim, n_bins)

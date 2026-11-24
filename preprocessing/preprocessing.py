@@ -19,8 +19,12 @@ LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-Min
 # Data Loading
 # ─────────────────────────────────────────────────────────────────────────────
 
-def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None):
-    """Load combined dataset from HDF5, returns list[dict] and metadata."""
+def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image_encoder=None):
+    """
+    Load combined dataset from HDF5, returns list[dict] and metadata. With image_encoder, each episode's frames
+    are replaced by their features (see encode_frames) right after reading, so the images of all episodes
+    are never in memory together.
+    """
     import h5py
     data, metadata = [], {}
     with h5py.File(f"{path_data}/{oxe_dataset_name}.h5", "r") as f:
@@ -34,7 +38,8 @@ def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None):
             print(f"n_episodes: {len(grp.keys())}")
             for ep_idx, ep_key in enumerate(grp.keys()):
                 g = grp[ep_key]
-                images = {k: g["images"][k][:] for k in g["images"].keys()}
+                images = {k: g["images"][k][:] if image_encoder is None else encode_frames(g["images"][k][:], image_encoder)
+                          for k in g["images"].keys()}
                 actions = {k: g["actions"][k][:] for k in g["actions"].keys()}
                 lang = {k: g["language"][k][:] for k in g["language"].keys()}
                 n_steps = next(iter(actions.values())).shape[0]
@@ -155,6 +160,24 @@ def episode_to_ids(dataset):
     return episode_to_indices
 
 
+def prepare_frames(frames, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
+    """Frames (T, H, W, C), uint8 (scaled to [0, 1]) or float -> resized, normalized tensor (T, C, out_dim, out_dim)."""
+    from torchvision import transforms
+    import torchvision.transforms.functional as TF
+    x = torch.from_numpy(np.ascontiguousarray(frames)).permute(0, 3, 1, 2).contiguous()  # standard NCHW layout
+    x = x.float().div(255) if x.dtype == torch.uint8 else x.float()
+    x = transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR)(x)
+    return TF.normalize(x, mean, std)
+
+
+@torch.no_grad()
+def encode_frames(frames, image_encoder, batch_size=256):
+    """Frames (T, H, W, C) -> what a frozen DinoV2Encoder caches per frame (its cache_features), batch by batch."""
+    device = next(image_encoder.parameters()).device
+    return torch.cat([image_encoder.cache_features(prepare_frames(frames[i:i + batch_size]).to(device)).cpu()
+                      for i in range(0, len(frames), batch_size)])
+
+
 def image_resizing(data, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
     """
     Resize images to out_dim x out_dim and normalize them per channel. By default with the fixed ImageNet
@@ -162,18 +185,16 @@ def image_resizing(data, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
     mean=None and std=None restore the old behaviour (statistics per (dataset, episode)): that only suits the
     from-scratch ViT and cannot be reproduced at rollout, where the episode's statistics are unknown in advance.
     """
-    from torchvision import transforms
-    import torchvision.transforms.functional as TF
-
     if (mean is None) != (std is None):
         raise ValueError("Pass both mean and std, or neither (per-episode statistics).")
-    resize = transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR)
-
     if mean is not None:
         for s in data:
-            s["image"] = TF.normalize(resize(TF.to_tensor(s["image"])), mean, std)
+            s["image"] = prepare_frames(s["image"][None], out_dim, mean, std)[0]
         return data
 
+    from torchvision import transforms
+    import torchvision.transforms.functional as TF
+    resize = transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR)
     for indices in episode_to_ids(data).values():
         stack = torch.stack([TF.to_tensor(data[i]["image"]) for i in indices])
         ep_mean, ep_std = stack.mean(dim=[0, 2, 3]), stack.std(dim=[0, 2, 3]).clamp(min=1e-6)
@@ -313,11 +334,13 @@ class DistributedWeightedSampler:
 
 def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=None,
                         batch_size=32, data_name_lst=None, use_ddp=False,
-                        local_rank=0, world_size=1, preprocessed_path=None):
+                        local_rank=0, world_size=1, preprocessed_path=None, image_encoder=None):
     """
     Build OXE train/val dataloaders, single-process or DDP. Only global rank 0 preprocesses. A single process
     keeps the result in memory; with several processes, or when preprocessed_path is given, it is written to
     disk and memory-mapped by every process. An existing preprocessed_path is reused instead of preprocessing.
+    With image_encoder (a frozen DinoV2Encoder) the dataset holds its cache_features output instead of images,
+    computed episode by episode while reading.
     """
     import torch.distributed as dist
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
@@ -328,15 +351,20 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     rank = dist.get_rank() if use_ddp else 0
     dataset_path = Path(preprocessed_path or "./preprocessed_data/preprocessed_dataset.pt")
 
+    features = None if image_encoder is None else image_encoder.name  # None: the dataset holds images
+
     loaded = None
     if rank == 0 and not (preprocessed_path and dataset_path.exists()):
-        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst)
+        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst, image_encoder)
         print(f"Total samples: {len(data)}", flush=True)
         data, action_pct = apply_discretization(data, metadata, n_bins)
-        data = image_resizing(filter_keys(data, keys_to_keep, renaming_keys))
+        data = filter_keys(data, keys_to_keep, renaming_keys)
+        if image_encoder is None:
+            data = image_resizing(data)
         data, lang_dim, _ = add_language_embeddings(data)
         loaded = {**_build_shared_data(data, metadata), "metadata": metadata, "action_percentiles": action_pct,
-                  "lang_dim": lang_dim, "image_normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD}}
+                  "lang_dim": lang_dim, "image_normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD},
+                  "image_features": features}
         del data  # release the per-sample copies
         if world_size > 1 or preprocessed_path:
             dataset_path.parent.mkdir(parents=True, exist_ok=True)
@@ -354,6 +382,9 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     if norm is None or tuple(norm["mean"]) != IMAGENET_MEAN or tuple(norm["std"]) != IMAGENET_STD:
         raise ValueError(f"{dataset_path} was preprocessed with image normalization {norm}, expected mean "
                          f"{IMAGENET_MEAN} and std {IMAGENET_STD}. Delete it or run without --preprocessed_path.")
+    if loaded.get("image_features") != features:
+        raise ValueError(f"{dataset_path} holds {loaded.get('image_features') or 'images'}, but this run needs "
+                         f"{features or 'images'}. Delete it or run without --preprocessed_path.")
 
     dataset = SharedMemoryRobotDataset(loaded)
     train_idx, val_idx = split_by_episode(dataset)
@@ -366,7 +397,7 @@ def _build_shared_data(data, metadata):
     names = list(metadata.keys())
     name_to_id = {n: i for i, n in enumerate(names)}
     return {
-        "images": torch.stack([s["image"] for s in data]).float(),
+        "images": torch.stack([s["image"] for s in data]),  # float16 tokens of a partly fine-tuned DINOv2 stay so
         "actions": torch.as_tensor(np.stack([s["actions"] for s in data]), dtype=torch.int64),
         "language_embeddings": torch.stack([s["language_embedding"] for s in data]).float(),
         "dataset_ids": torch.tensor([name_to_id[s["dataset_name"]] for s in data], dtype=torch.int64),

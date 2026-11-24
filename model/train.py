@@ -31,7 +31,9 @@ def get_model(parameters: dict):
 
     if encoder.startswith("dinov2"):
         vit = DinoV2Encoder(model_name=encoder, freeze=parameters.get("freeze_encoder", True),
-                            pooling=parameters.get("pooling", "cls"), use_lang=use_lang)
+                            pooling=parameters.get("pooling", "cls"), use_lang=use_lang,
+                            grid_size=parameters.get("grid_size", 4),
+                            train_blocks=parameters.get("train_blocks", 0))  # last blocks that still train
         embed_dim = vit.embed_dim  # set by the backbone, not by the config
     else:
         embed_dim = parameters["embed_dim"]
@@ -43,7 +45,8 @@ def get_model(parameters: dict):
             use_lang=use_lang, lang_dim=lang_dim,
         )
 
-    head = ActionHead(embed_dim=embed_dim, action_dim=6, use_lang=use_lang, lang_dim=lang_dim, dropout=dropout)
+    head = ActionHead(embed_dim=embed_dim, action_dim=6, use_lang=use_lang, lang_dim=lang_dim, dropout=dropout,
+                      n_tokens=getattr(vit, "n_tokens", 1))  # several tokens: the head pools them by attention
     return RoboticActionModel(vit, {HYDRA: head})
 
 
@@ -158,28 +161,10 @@ def diagnose_action_bins(model, loader, device, n_actions=6, n_bins=N_BINS):
             print(f"Action {d}: " + ", ".join(f"{k.replace('_', ' ')}={v:.3f}" if isinstance(v, float)
                                               else f"{k.replace('_', ' ')}={v}" for k, v in results[d].items()),
                   flush=True)
+    if results and (not is_ddp or dist.get_rank() == 0):  # the mean is comparable with the per-epoch accuracy
+        means = {k: np.mean([r[k] for r in results.values()]) for k in list(next(iter(results.values())))[:4]}
+        print("Mean over actions: " + ", ".join(f"{k.replace('_', ' ')}={v:.3f}" for k, v in means.items()), flush=True)
     return results
-
-
-@torch.no_grad()
-def cache_frozen_features(encoder, dataset, device, batch_size=256):
-    """
-    Replace the dataset's images by the features of the frozen encoder. Without fine-tuning or augmentation
-    they never change, so encoding every frame once replaces running the encoder in every epoch.
-    Under DDP every process encodes every world_size-th frame, then the processes exchange their parts.
-    """
-    is_ddp = dist.is_available() and dist.is_initialized()
-    rank, world = (dist.get_rank(), dist.get_world_size()) if is_ddp else (0, 1)
-    idx = torch.arange(rank, len(dataset.images), world)
-    feats = torch.cat([encoder(dataset.images[idx[i:i + batch_size]].to(device)).cpu()
-                       for i in range(0, len(idx), batch_size)])
-    if world > 1:
-        parts = [None] * world
-        dist.all_gather_object(parts, feats)
-        feats = torch.empty(len(dataset.images), feats.shape[1])
-        for r, part in enumerate(parts):
-            feats[r::world] = part
-    dataset.images = feats
 
 
 def setup_distributed_training():
@@ -224,10 +209,15 @@ def train(model, train_loader, val_loader, device, settings, num_epochs, world_s
     base_model = model.module if use_ddp else model
     loss_fn = partial(action_ce_loss, class_weights=class_weights, label_smoothing=settings.get("label_smoothing", 0.0))
     lr = settings["learning_rate"]
-    optimizer = AdamW(base_model.parameters(), lr=lr, betas=(0.9, 0.999), weight_decay=settings.get("weight_decay", 0.01))
+    # Fine-tuned DINOv2 blocks get their own, usually smaller, learning rate: encoder_learning_rate.
+    encoder = [p for p in base_model.vit.parameters() if p.requires_grad] if isinstance(base_model.vit, DinoV2Encoder) else []
+    groups = [{"params": [p for p in base_model.parameters() if all(p is not q for q in encoder)], "lr": lr}]
+    if encoder:
+        groups.append({"params": encoder, "lr": settings.get("encoder_learning_rate", lr)})
+    optimizer = AdamW(groups, betas=(0.9, 0.999), weight_decay=settings.get("weight_decay", 0.01))
     scheduler = None
     if settings.get("lr_schedule") == "cosine":  # epochs run from 0 to num_epochs inclusive
-        scheduler = OneCycleLR(optimizer, max_lr=lr, total_steps=(num_epochs + 1) * len(train_loader),
+        scheduler = OneCycleLR(optimizer, max_lr=[g["lr"] for g in groups], total_steps=(num_epochs + 1) * len(train_loader),
                                pct_start=settings.get("warmup_frac", 0.05), cycle_momentum=False)
 
     best_val_loss, start_epoch = float("inf"), 0
@@ -326,8 +316,18 @@ if __name__ == "__main__":
     torch.set_num_interop_threads(1)
 
     # ─────────────────────────────────────────────────────────────────────────────
-    # Prepare data & model.
+    # Prepare model & data.
     # ─────────────────────────────────────────────────────────────────────────────
+    parameters = settings["model_parameters"]
+    parameters["use_lang"] = parameters.get("use_lang", False)
+    if rank == 0: print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model", flush=True)
+    model = get_model(parameters)  # before the data, so that preprocessing can use a frozen encoder
+    device = torch.device(f"cuda:{local_rank}" if args.use_ddp and torch.cuda.is_available() else "cpu")
+
+    # A frozen encoder gives the same features in every epoch: preprocessing replaces each episode's frames by
+    # their features right after reading them (never holding all images), then training only updates the head
+    # (with train_blocks > 0: the features are the tokens after the frozen blocks, and the last blocks train too).
+    frozen = isinstance(model.vit, DinoV2Encoder) and model.vit.freeze
     t0 = time.perf_counter() # keep track of time taken by preprocessing and training.
     train_loader, val_loader, lang_dim = get_dataloaders_oxe(
         cfg=args.settings, n_bins=N_BINS,
@@ -339,22 +339,12 @@ if __name__ == "__main__":
         local_rank=local_rank,
         world_size=world_size,
         preprocessed_path=args.preprocessed_path,
+        image_encoder=model.vit.to(device) if frozen else None,
     )
-    if rank == 0: print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min", flush=True)
-
-    parameters = settings["model_parameters"]
-    parameters["lang_dim"] = lang_dim
-    parameters["use_lang"] = parameters.get("use_lang", False)
-    if rank == 0: print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model", flush=True)
-    model = get_model(parameters)
-    device = torch.device(f"cuda:{local_rank}" if args.use_ddp and torch.cuda.is_available() else "cpu")
-
-    # A frozen encoder gives the same features in every epoch: compute them once, then train only the head.
-    # Must run before the loaders are iterated (their persistent workers keep the dataset they start with).
-    if isinstance(model.vit, DinoV2Encoder) and model.vit.freeze:
-        t0 = time.perf_counter()
-        cache_frozen_features(model.vit.to(device), train_loader.dataset.dataset, device)
-        if rank == 0: print(f"Encoder features cached: {(time.perf_counter() - t0) / 60:.2f} min", flush=True)
+    if rank == 0: print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min, "
+                        f"inputs {tuple(train_loader.dataset.dataset.images.shape)}", flush=True)
+    if parameters["use_lang"] and lang_dim != parameters.get("lang_dim", 384):
+        raise ValueError(f"Language embeddings have {lang_dim} values, the model expects {parameters.get('lang_dim', 384)}.")
 
     # Memorization sanity check: train and evaluate on the same few fixed training samples.
     if settings.get("overfit_samples"):
