@@ -1,0 +1,73 @@
+JOB START: Wed Nov 25 14:54:25 CET 2026
+JOB ID: 17557209
+CPUs: 32
+DDP processes: 1
+OMP threads: 32
+Modules loaded: Wed Nov 25 14:54:39 CET 2026
+Environment activated: Wed Nov 25 14:54:41 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Wed Nov 25 14:54:42 CET 2026
+Batch size=256 (global 256), Rank=0, Local_rank=0, World_size=1, CPUs=32, OMP_THREADS=32, Available_CPUs=32, PyTorch threads: 32
+
+Vision-only Model, inverse-dynamics probe: frames t and t+1 -> action at t
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+n_episodes: 150
+Total samples: 95711
+3 unique instructions
+random pairs: mean cosine 0.6605
+gap  1: mean cosine 0.9907, identical 0.0%
+gap  3: mean cosine 0.9804, identical 0.0%
+gap 10: mean cosine 0.9546, identical 0.0%
+gap 30: mean cosine 0.9126, identical 0.0%
+Preprocessing time: 30.75 min, inputs (95711, 17, 384)
+epoch   0 | train 2.9697/0.1459 | val 2.8838/0.1526 | lr 4.00e-05 | 0.57 min
+epoch   1 | train 2.7902/0.1625 | val 2.7126/0.1576 | lr 1.30e-04 | 0.49 min
+epoch   2 | train 2.6128/0.1831 | val 2.6491/0.1679 | lr 3.66e-04 | 0.60 min
+epoch   3 | train 2.5346/0.1949 | val 2.6397/0.1709 | lr 6.60e-04 | 0.45 min
+epoch   4 | train 2.4731/0.2079 | val 2.6182/0.1699 | lr 9.02e-04 | 0.54 min
+epoch   5 | train 2.4153/0.2199 | val 2.6240/0.1732 | lr 1.00e-03 | 0.96 min
+epoch   6 | train 2.3606/0.2330 | val 2.6564/0.1722 | lr 1.00e-03 | 0.66 min
+epoch   7 | train 2.3181/0.2430 | val 2.6601/0.1693 | lr 9.99e-04 | 0.67 min
+epoch   8 | train 2.2744/0.2536 | val 2.7030/0.1733 | lr 9.98e-04 | 0.41 min
+epoch   9 | train 2.2331/0.2655 | val 2.6829/0.1630 | lr 9.96e-04 | 0.39 min
+epoch  10 | train 2.1959/0.2745 | val 2.7550/0.1673 | lr 9.93e-04 | 0.37 min
+epoch  11 | train 2.1617/0.2832 | val 2.8007/0.1658 | lr 9.91e-04 | 0.41 min
+epoch  12 | train 2.1271/0.2924 | val 2.8252/0.1680 | lr 9.87e-04 | 0.39 min
+epoch  13 | train 2.0945/0.3003 | val 2.8333/0.1672 | lr 9.83e-04 | 0.37 min
+epoch  14 | train 2.0643/0.3102 | val 2.8674/0.1635 | lr 9.79e-04 | 0.37 min
+epoch  15 | train 2.0327/0.3177 | val 2.9556/0.1603 | lr 9.74e-04 | 0.38 min
+epoch  16 | train 2.0039/0.3260 | val 2.8792/0.1627 | lr 9.68e-04 | 0.39 min
+epoch  17 | train 1.9791/0.3332 | val 3.0239/0.1625 | lr 9.62e-04 | 0.38 min
+epoch  18 | train 1.9529/0.3406 | val 3.0642/0.1582 | lr 9.56e-04 | 0.38 min
+epoch  19 | train 1.9232/0.3487 | val 3.0788/0.1602 | lr 9.49e-04 | 0.42 min
+epoch  20 | train 1.8990/0.3550 | val 3.1030/0.1585 | lr 9.41e-04 | 0.40 min
+epoch  21 | train 1.8774/0.3610 | val 3.1309/0.1603 | lr 9.33e-04 | 0.45 min
+epoch  22 | train 1.8486/0.3699 | val 3.2137/0.1572 | lr 9.25e-04 | 0.38 min
+epoch  23 | train 1.8352/0.3738 | val 3.1604/0.1576 | lr 9.16e-04 | 0.36 min
+epoch  24 | train 1.8122/0.3799 | val 3.1436/0.1581 | lr 9.07e-04 | 0.65 min
+epoch  25 | train 1.7840/0.3888 | val 3.2982/0.1568 | lr 8.97e-04 | 0.47 min
+epoch  26 | train 1.7634/0.3934 | val 3.2576/0.1564 | lr 8.87e-04 | 0.49 min
+epoch  27 | train 1.7472/0.3998 | val 3.2772/0.1597 | lr 8.76e-04 | 0.44 min
+epoch  28 | train 1.7240/0.4053 | val 3.3078/0.1574 | lr 8.65e-04 | 0.57 min
+epoch  29 | train 1.7018/0.4125 | val 3.4290/0.1566 | lr 8.54e-04 | 0.35 min
+epoch  30 | train 1.6782/0.4197 | val 3.4163/0.1565 | lr 8.42e-04 | 0.50 min
+epoch  31 | train 1.6623/0.4238 | val 3.5173/0.1579 | lr 8.30e-04 | 0.37 min
+epoch  32 | train 1.6398/0.4314 | val 3.4786/0.1564 | lr 8.18e-04 | 0.46 min
+epoch  33 | train 1.6221/0.4377 | val 3.5652/0.1518 | lr 8.05e-04 | 0.44 min
+epoch  34 | train 1.6005/0.4433 | val 3.5972/0.1571 | lr 7.92e-04 | 0.38 min
+epoch  35 | train 1.5787/0.4491 | val 3.6290/0.1545 | lr 7.78e-04 | 0.42 min
+============ Job Information ===================================================
+Submitted: 2026-11-25T14:54:11
+Started: 2026-11-25T14:54:16
+Ended: 2026-11-25T15:47:08
+Elapsed: 53 min, Limit: 480 min, Difference: 427 min
+CPUs: 32, Nodes: 1
+Estimated credit Consumption: 28.27 core-hours
+================================================================================

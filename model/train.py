@@ -45,9 +45,17 @@ def get_model(parameters: dict):
             use_lang=use_lang, lang_dim=lang_dim,
         )
 
-    head = ActionHead(embed_dim=embed_dim, action_dim=6, use_lang=use_lang, lang_dim=lang_dim, dropout=dropout,
-                      n_tokens=getattr(vit, "n_tokens", 1))  # several tokens: the head pools them by attention
-    return RoboticActionModel(vit, {HYDRA: head})
+    # Inverse-dynamics probe: frames t and t+frame_gap -> sum of the actions at t, ..., t+frame_gap-1.
+    inverse_dynamics = parameters.get("inverse_dynamics", False)
+    frame_input = parameters.get("frame_input", "concat")  # how the probe combines the two frames' features
+    if frame_input not in ("concat", "diff"):
+        raise ValueError(f"frame_input must be 'concat' or 'diff', got {frame_input!r}.")
+    n_frames = 2 if inverse_dynamics else 1
+    frame_diff = inverse_dynamics and frame_input == "diff"  # f(t+gap) - f(t) keeps one frame's feature width
+    head = ActionHead(embed_dim=embed_dim * (1 if frame_diff else n_frames), action_dim=6, use_lang=use_lang,
+                      lang_dim=lang_dim, dropout=dropout,
+                      n_tokens=getattr(vit, "n_tokens", 1))  # several tokens: pooled by attention
+    return RoboticActionModel(vit, {HYDRA: head}, n_frames=n_frames, frame_diff=frame_diff)
 
 
 def action_ce_loss(logits, targets, class_weights=None, label_smoothing=0.0):
@@ -320,7 +328,17 @@ if __name__ == "__main__":
     # ─────────────────────────────────────────────────────────────────────────────
     parameters = settings["model_parameters"]
     parameters["use_lang"] = parameters.get("use_lang", False)
-    if rank == 0: print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model", flush=True)
+    # Inverse-dynamics probe: frames t and t+frame_gap -> sum of the actions at t, ..., t+frame_gap-1 (0: no probe).
+    frame_gap = int(parameters.get("frame_gap", 1)) if parameters.get("inverse_dynamics", False) else 0
+    if parameters.get("inverse_dynamics", False) and frame_gap < 1:
+        raise ValueError(f"frame_gap must be at least 1, got {frame_gap}.")
+    if rank == 0:
+        combined = ("feature difference" if parameters.get("frame_input", "concat") == "diff"
+                    else "concatenated features")
+        target = "action at t" if frame_gap == 1 else f"sum of the actions at t..t+{frame_gap - 1}"
+        print(f"{'Vision-Language' if parameters['use_lang'] else 'Vision-only'} Model"
+              + (f", inverse-dynamics probe: frames t and t+{frame_gap} ({combined}) -> {target}"
+                 if frame_gap else ""), flush=True)
     model = get_model(parameters)  # before the data, so that preprocessing can use a frozen encoder
     device = torch.device(f"cuda:{local_rank}" if args.use_ddp and torch.cuda.is_available() else "cpu")
 
@@ -340,8 +358,20 @@ if __name__ == "__main__":
         world_size=world_size,
         preprocessed_path=args.preprocessed_path,
         image_encoder=model.vit.to(device) if frozen else None,
+        frame_gap=frame_gap,  # samples hold frames t and t+frame_gap, targets the summed actions in between
     )
-    if rank == 0: print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min, "
+    if rank == 0:
+        # # do features change between consecutive frames?
+        # ds = val_loader.dataset.dataset                        # all samples, in time order
+        # n = 20_000                                             # ~30 episodes is enough
+        # f = ds.images[:n].float().flatten(1)
+        # ep = (ds.dataset_ids * (int(ds.episode_indices.max()) + 1) + ds.episode_indices)[:n]
+        # print(f"random pairs: mean cosine {F.cosine_similarity(f, f[torch.randperm(n)], dim=1).mean():.4f}")
+        # for k in (1, 3, 10, 30):
+        #     same = ep[k:] == ep[:-k]
+        #     cos = F.cosine_similarity(f[k:][same], f[:-k][same], dim=1)
+        #     print(f"gap {k:2d}: mean cosine {cos.mean():.4f}, identical {(cos > 0.9999).float().mean():.1%}")
+        print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min, "
                         f"inputs {tuple(train_loader.dataset.dataset.images.shape)}", flush=True)
     if parameters["use_lang"] and lang_dim != parameters.get("lang_dim", 384):
         raise ValueError(f"Language embeddings have {lang_dim} values, the model expects {parameters.get('lang_dim', 384)}.")

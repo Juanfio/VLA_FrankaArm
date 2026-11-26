@@ -21,7 +21,10 @@
     "model_parameters":{
         "encoder": "dinov2_vits14",
         "freeze_encoder": true,
-        "train_blocks": 2,
+        "train_blocks": 0,
+        "inverse_dynamics": true,
+        "frame_gap": 10,
+        "frame_input": "diff",
         "pooling": "grid",
         "grid_size": 4,
         "img_size": 224,
@@ -45,5 +48,5 @@
     "class_weights": false,
     "overfit_samples": 0,
     "save_checkpoint": false,
-    "model_filename": "stanford_hydra-150_episodes-dinov2_vits14-last2blocks-grid4-cosine_lr1e-3-enclr1e-4-bs256"
+    "model_filename": "stanford_hydra-150_episodes-dinov2_vits14-frozen-grid4-inverse_dynamics-gap10_diff_sum-cosine_lr1e-3-bs256"
 }

@@ -357,11 +357,19 @@ class RoboticActionModel(nn.Module):
     Supports:
     - Pure vision model: ViT encodes images only
     - Vision-language model: ViT encodes images + language tokens, fusion via concatenation
+    - Inverse-dynamics probe (n_frames=2): frames t and t+gap are encoded separately; the head gets their
+      features concatenated (built for n_frames * embed_dim) or, with frame_diff=True, their difference
+      f(t+gap) - f(t) (built for embed_dim), so it sees what the actions between the two frames did.
     """
 
-    def __init__(self, vit: VisionTransformer | DinoV2Encoder, action_heads: dict[str, ActionHead]):
+    def __init__(self, vit: VisionTransformer | DinoV2Encoder, action_heads: dict[str, ActionHead],
+                 n_frames: int = 1, frame_diff: bool = False):
         super().__init__()
         self.vit = vit
+        self.n_frames = n_frames  # frames per sample: inputs are (B, n_frames, ...) when > 1
+        if frame_diff and n_frames != 2:
+            raise ValueError(f"frame_diff needs n_frames=2 (frames t and t+gap), got n_frames={n_frames}.")
+        self.frame_diff = frame_diff  # head input f(second frame) - f(first frame) instead of the concatenation
 
         # Validate action_heads match vit's use_lang setting
         for name, head in action_heads.items():
@@ -374,6 +382,11 @@ class RoboticActionModel(nn.Module):
         self.action_heads = nn.ModuleDict(action_heads)
 
     def forward(self, images: torch.Tensor, lang: torch.Tensor, dataset_name: str) -> torch.Tensor:
-        # images: (B, 3, H, W), or what a frozen DINOv2 encoder cached in preprocessing (it handles both)
-        y = self.vit(images, lang)                          # shared image encoder
+        # images: (B, 3, H, W), or what a frozen DINOv2 encoder cached in preprocessing (it handles both);
+        # with n_frames > 1 a frame dimension follows the batch: (B, n_frames, ...)
+        if self.n_frames > 1:  # encode each frame, then subtract the features or concatenate them (last dimension)
+            features = [self.vit(images[:, i], lang) for i in range(self.n_frames)]
+            y = features[1] - features[0] if self.frame_diff else torch.cat(features, dim=-1)
+        else:
+            y = self.vit(images, lang)                      # shared image encoder
         return self.action_heads[dataset_name](y, lang)     # (B, action_dim, n_bins)

@@ -1,0 +1,104 @@
+JOB START: Wed Nov 25 09:47:25 CET 2026
+JOB ID: 17550111
+CPUs: 32
+DDP processes: 1
+OMP threads: 32
+Modules loaded: Wed Nov 25 09:47:28 CET 2026
+Environment activated: Wed Nov 25 09:47:28 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Wed Nov 25 09:47:29 CET 2026
+Batch size=256 (global 256), Rank=0, Local_rank=0, World_size=1, CPUs=32, OMP_THREADS=32, Available_CPUs=32, PyTorch threads: 32
+
+Vision-only Model, inverse-dynamics probe: frames t and t+1 -> action at t
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+n_episodes: 150
+Total samples: 95711
+3 unique instructions
+Preprocessing time: 33.47 min, inputs (95711, 17, 384)
+epoch   0 | train 2.9730/0.1469 | val 2.8853/0.1537 | lr 4.00e-05 | 1.91 min
+epoch   1 | train 2.7926/0.1626 | val 2.7270/0.1558 | lr 1.30e-04 | 0.95 min
+epoch   2 | train 2.6178/0.1820 | val 2.6681/0.1679 | lr 3.66e-04 | 0.74 min
+epoch   3 | train 2.5394/0.1957 | val 2.6290/0.1722 | lr 6.60e-04 | 0.96 min
+epoch   4 | train 2.4816/0.2062 | val 2.6259/0.1709 | lr 9.02e-04 | 0.75 min
+epoch   5 | train 2.4227/0.2187 | val 2.6227/0.1758 | lr 1.00e-03 | 0.81 min
+epoch   6 | train 2.3689/0.2311 | val 2.6677/0.1688 | lr 1.00e-03 | 0.97 min
+epoch   7 | train 2.3257/0.2410 | val 2.6750/0.1698 | lr 9.99e-04 | 0.62 min
+epoch   8 | train 2.2818/0.2525 | val 2.6885/0.1716 | lr 9.98e-04 | 0.70 min
+epoch   9 | train 2.2433/0.2624 | val 2.7079/0.1640 | lr 9.96e-04 | 0.93 min
+epoch  10 | train 2.2072/0.2717 | val 2.7321/0.1687 | lr 9.93e-04 | 0.71 min
+epoch  11 | train 2.1680/0.2821 | val 2.8479/0.1639 | lr 9.91e-04 | 0.81 min
+epoch  12 | train 2.1389/0.2899 | val 2.7881/0.1680 | lr 9.87e-04 | 0.97 min
+epoch  13 | train 2.1079/0.2983 | val 2.8494/0.1691 | lr 9.83e-04 | 0.92 min
+epoch  14 | train 2.0746/0.3071 | val 2.8683/0.1667 | lr 9.79e-04 | 1.06 min
+epoch  15 | train 2.0441/0.3145 | val 2.8821/0.1611 | lr 9.74e-04 | 1.42 min
+epoch  16 | train 2.0162/0.3233 | val 2.9322/0.1640 | lr 9.68e-04 | 1.28 min
+epoch  17 | train 1.9918/0.3290 | val 2.9884/0.1638 | lr 9.62e-04 | 1.82 min
+epoch  18 | train 1.9660/0.3380 | val 2.9660/0.1623 | lr 9.56e-04 | 0.80 min
+epoch  19 | train 1.9367/0.3452 | val 3.0735/0.1594 | lr 9.49e-04 | 1.35 min
+epoch  20 | train 1.9138/0.3513 | val 3.1406/0.1596 | lr 9.41e-04 | 1.31 min
+epoch  21 | train 1.8876/0.3594 | val 3.0715/0.1612 | lr 9.33e-04 | 0.87 min
+epoch  22 | train 1.8629/0.3663 | val 3.1679/0.1565 | lr 9.25e-04 | 1.36 min
+epoch  23 | train 1.8490/0.3702 | val 3.1698/0.1588 | lr 9.16e-04 | 0.78 min
+epoch  24 | train 1.8241/0.3772 | val 3.1195/0.1592 | lr 9.07e-04 | 0.87 min
+epoch  25 | train 1.7967/0.3854 | val 3.3511/0.1570 | lr 8.97e-04 | 0.86 min
+epoch  26 | train 1.7727/0.3919 | val 3.2664/0.1554 | lr 8.87e-04 | 1.50 min
+epoch  27 | train 1.7570/0.3977 | val 3.3544/0.1572 | lr 8.76e-04 | 0.53 min
+epoch  28 | train 1.7346/0.4036 | val 3.3785/0.1567 | lr 8.65e-04 | 0.55 min
+epoch  29 | train 1.7151/0.4086 | val 3.3948/0.1565 | lr 8.54e-04 | 0.74 min
+epoch  30 | train 1.6936/0.4162 | val 3.5315/0.1553 | lr 8.42e-04 | 0.87 min
+epoch  31 | train 1.6741/0.4218 | val 3.4828/0.1550 | lr 8.30e-04 | 0.74 min
+epoch  32 | train 1.6538/0.4288 | val 3.5745/0.1536 | lr 8.18e-04 | 0.78 min
+epoch  33 | train 1.6358/0.4333 | val 3.6727/0.1564 | lr 8.05e-04 | 0.56 min
+epoch  34 | train 1.6132/0.4399 | val 3.6435/0.1542 | lr 7.92e-04 | 0.65 min
+epoch  35 | train 1.5921/0.4450 | val 3.7840/0.1537 | lr 7.78e-04 | 0.63 min
+epoch  36 | train 1.5745/0.4517 | val 3.7222/0.1544 | lr 7.64e-04 | 0.97 min
+epoch  37 | train 1.5641/0.4555 | val 3.7786/0.1542 | lr 7.50e-04 | 0.63 min
+epoch  38 | train 1.5436/0.4606 | val 3.7687/0.1526 | lr 7.36e-04 | 0.48 min
+epoch  39 | train 1.5252/0.4661 | val 3.8197/0.1526 | lr 7.22e-04 | 0.49 min
+epoch  40 | train 1.5046/0.4730 | val 3.9491/0.1518 | lr 7.07e-04 | 0.82 min
+epoch  41 | train 1.4892/0.4768 | val 3.9967/0.1447 | lr 6.92e-04 | 0.76 min
+epoch  42 | train 1.4672/0.4837 | val 3.9611/0.1504 | lr 6.77e-04 | 0.69 min
+epoch  43 | train 1.4498/0.4898 | val 4.0987/0.1488 | lr 6.61e-04 | 0.66 min
+epoch  44 | train 1.4330/0.4951 | val 4.1590/0.1490 | lr 6.46e-04 | 0.75 min
+epoch  45 | train 1.4089/0.5028 | val 4.2172/0.1485 | lr 6.30e-04 | 0.66 min
+epoch  46 | train 1.3940/0.5079 | val 4.2316/0.1491 | lr 6.14e-04 | 0.60 min
+epoch  47 | train 1.3831/0.5114 | val 4.2246/0.1521 | lr 5.98e-04 | 0.62 min
+epoch  48 | train 1.3632/0.5172 | val 4.3649/0.1462 | lr 5.82e-04 | 0.55 min
+epoch  49 | train 1.3492/0.5224 | val 4.4138/0.1474 | lr 5.66e-04 | 0.70 min
+epoch  50 | train 1.3267/0.5288 | val 4.3804/0.1465 | lr 5.49e-04 | 0.61 min
+epoch  51 | train 1.3137/0.5335 | val 4.5315/0.1502 | lr 5.33e-04 | 1.22 min
+epoch  52 | train 1.2961/0.5386 | val 4.5518/0.1474 | lr 5.17e-04 | 0.61 min
+epoch  53 | train 1.2839/0.5432 | val 4.6615/0.1476 | lr 5.00e-04 | 0.64 min
+epoch  54 | train 1.2621/0.5510 | val 4.5837/0.1455 | lr 4.84e-04 | 0.70 min
+epoch  55 | train 1.2471/0.5547 | val 4.7592/0.1452 | lr 4.68e-04 | 0.61 min
+epoch  56 | train 1.2313/0.5616 | val 4.7061/0.1467 | lr 4.51e-04 | 0.89 min
+epoch  57 | train 1.2183/0.5647 | val 4.8348/0.1454 | lr 4.35e-04 | 0.68 min
+epoch  58 | train 1.1995/0.5718 | val 4.8556/0.1461 | lr 4.19e-04 | 0.70 min
+epoch  59 | train 1.1869/0.5762 | val 4.9683/0.1464 | lr 4.03e-04 | 0.56 min
+epoch  60 | train 1.1714/0.5817 | val 4.9580/0.1458 | lr 3.87e-04 | 0.61 min
+epoch  61 | train 1.1628/0.5837 | val 5.0237/0.1448 | lr 3.71e-04 | 0.79 min
+epoch  62 | train 1.1402/0.5932 | val 5.1929/0.1452 | lr 3.55e-04 | 0.73 min
+epoch  63 | train 1.1275/0.5968 | val 5.2468/0.1429 | lr 3.40e-04 | 0.68 min
+epoch  64 | train 1.1094/0.6031 | val 5.2489/0.1420 | lr 3.24e-04 | 0.54 min
+epoch  65 | train 1.0992/0.6070 | val 5.3596/0.1439 | lr 3.09e-04 | 0.76 min
+epoch  66 | train 1.0839/0.6121 | val 5.3776/0.1436 | lr 2.94e-04 | 0.65 min
+epoch  67 | train 1.0735/0.6167 | val 5.4515/0.1437 | lr 2.79e-04 | 0.82 min
+epoch  68 | train 1.0573/0.6225 | val 5.5132/0.1444 | lr 2.65e-04 | 0.66 min
+epoch  69 | train 1.0484/0.6262 | val 5.5356/0.1452 | lr 2.50e-04 | 0.81 min
+epoch  70 | train 1.0355/0.6302 | val 5.5997/0.1425 | lr 2.36e-04 | 0.63 min
+epoch  71 | train 1.0224/0.6358 | val 5.6846/0.1422 | lr 2.22e-04 | 0.76 min
+============ Job Information ===================================================
+Submitted: 2026-11-25T09:47:23
+Started: 2026-11-25T09:47:23
+Ended: 2026-11-25T11:22:09
+Elapsed: 95 min, Limit: 1440 min, Difference: 1345 min
+CPUs: 32, Nodes: 1
+Estimated credit Consumption: 25.33 core-hours
+================================================================================

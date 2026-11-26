@@ -19,11 +19,34 @@ LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-Min
 # Data Loading
 # ─────────────────────────────────────────────────────────────────────────────
 
-def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image_encoder=None):
+def sum_next_actions(actions, horizon):
+    """
+    Replaces each step's action by the sum of the actions at t, ..., t+horizon-1 of the same episode. Near the
+    episode's end the sum stops at its last step (fewer terms); frame pairs never start there (see frame_gap).
+
+        Args:
+            actions: np.ndarray
+                (T, D) or (T,) continuous actions of one episode, in time order (deltas, e.g. EEF displacements).
+            horizon: int
+                number of consecutive actions summed; 1 returns the actions unchanged.
+
+        Returns:
+            summed: np.ndarray
+                array of the same shape and dtype, summed[t] = actions[t:t + horizon].sum(axis=0).
+    """
+    if horizon <= 1:
+        return actions
+    T = len(actions)
+    c = np.concatenate([np.zeros((1, *actions.shape[1:])), np.cumsum(actions, axis=0, dtype=np.float64)])
+    return (c[np.minimum(np.arange(T) + horizon, T)] - c[:T]).astype(actions.dtype)
+
+
+def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image_encoder=None, action_horizon=1):
     """
     Load combined dataset from HDF5, returns list[dict] and metadata. With image_encoder, each episode's frames
     are replaced by their features (see encode_frames) right after reading, so the images of all episodes
-    are never in memory together.
+    are never in memory together. With action_horizon > 1, each step's continuous actions are replaced by
+    their sum over the next action_horizon steps of the episode (see sum_next_actions), before discretization.
     """
     import h5py
     data, metadata = [], {}
@@ -40,7 +63,8 @@ def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image
                 g = grp[ep_key]
                 images = {k: g["images"][k][:] if image_encoder is None else encode_frames(g["images"][k][:], image_encoder)
                           for k in g["images"].keys()}
-                actions = {k: g["actions"][k][:] for k in g["actions"].keys()}
+                actions = {k: sum_next_actions(g["actions"][k][:], action_horizon)  # horizon 1: unchanged
+                           for k in g["actions"].keys()}
                 lang = {k: g["language"][k][:] for k in g["language"].keys()}
                 n_steps = next(iter(actions.values())).shape[0]
                 for t in range(n_steps):
@@ -283,10 +307,15 @@ def worker_init_fn(worker_id):
 
 
 class SharedMemoryRobotDataset(Dataset):
-    """Dataset backed by tensors, memory-mapped from disk when several DDP processes share them."""
+    """
+    Dataset backed by tensors, memory-mapped from disk when several DDP processes share them.
+    With frame_gap > 0 (inverse-dynamics probe), a sample's image holds frames t and t+frame_gap, (2, ...), with
+    the target stored at t; the indices used must then leave out each episode's last frame_gap frames.
+    """
 
-    def __init__(self, shared_data, indices=None):
+    def __init__(self, shared_data, indices=None, frame_gap=0):
         self.__dict__.update(shared_data)
+        self.frame_gap = frame_gap
         self.indices = (
             indices if indices is not None
             else range(len(self.images))
@@ -297,7 +326,8 @@ class SharedMemoryRobotDataset(Dataset):
     def __getitem__(self, idx):
         actual = self.indices[idx]
         return {
-            "image": self.images[actual],
+            "image": (torch.stack((self.images[actual], self.images[actual + self.frame_gap])) if self.frame_gap
+                      else self.images[actual]),
             "actions": self.actions[actual],
             "language_embedding": self.language_embeddings[actual],
             "dataset_id": self.dataset_ids[actual],
@@ -334,14 +364,19 @@ class DistributedWeightedSampler:
 
 def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=None,
                         batch_size=32, data_name_lst=None, use_ddp=False,
-                        local_rank=0, world_size=1, preprocessed_path=None, image_encoder=None):
+                        local_rank=0, world_size=1, preprocessed_path=None, image_encoder=None, frame_gap=0):
     """
     Build OXE train/val dataloaders, single-process or DDP. Only global rank 0 preprocesses. A single process
     keeps the result in memory; with several processes, or when preprocessed_path is given, it is written to
     disk and memory-mapped by every process. An existing preprocessed_path is reused instead of preprocessing.
     With image_encoder (a frozen DinoV2Encoder) the dataset holds its cache_features output instead of images,
-    computed episode by episode while reading.
+    computed episode by episode while reading. With frame_gap > 0 (inverse-dynamics probe), each sample holds
+    frames t and t+frame_gap of an episode, and its target is the sum of the actions at t, ..., t+frame_gap-1
+    (summed before discretization, so the bins span the summed actions); each episode's last frame_gap frames
+    are left out as first frames.
     """
+    if frame_gap < 0:
+        raise ValueError(f"frame_gap must be >= 0, got {frame_gap}.")
     import torch.distributed as dist
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
     oxe_name, path_data = settings["oxe_dataset_name"], settings["path_data"]
@@ -352,10 +387,11 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     dataset_path = Path(preprocessed_path or "./preprocessed_data/preprocessed_dataset.pt")
 
     features = None if image_encoder is None else image_encoder.name  # None: the dataset holds images
+    action_horizon = max(frame_gap, 1)  # frame pairs: the target sums the actions between the two frames
 
     loaded = None
     if rank == 0 and not (preprocessed_path and dataset_path.exists()):
-        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst, image_encoder)
+        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst, image_encoder, action_horizon)
         print(f"Total samples: {len(data)}", flush=True)
         data, action_pct = apply_discretization(data, metadata, n_bins)
         data = filter_keys(data, keys_to_keep, renaming_keys)
@@ -364,7 +400,7 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
         data, lang_dim, _ = add_language_embeddings(data)
         loaded = {**_build_shared_data(data, metadata), "metadata": metadata, "action_percentiles": action_pct,
                   "lang_dim": lang_dim, "image_normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD},
-                  "image_features": features}
+                  "image_features": features, "action_horizon": action_horizon}
         del data  # release the per-sample copies
         if world_size > 1 or preprocessed_path:
             dataset_path.parent.mkdir(parents=True, exist_ok=True)
@@ -385,9 +421,17 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     if loaded.get("image_features") != features:
         raise ValueError(f"{dataset_path} holds {loaded.get('image_features') or 'images'}, but this run needs "
                          f"{features or 'images'}. Delete it or run without --preprocessed_path.")
+    if loaded.get("action_horizon", 1) != action_horizon:  # files written before frame_gap hold single actions
+        raise ValueError(f"{dataset_path} holds actions summed over {loaded.get('action_horizon', 1)} steps, but this "
+                         f"run needs {action_horizon}. Delete it or run without --preprocessed_path.")
 
-    dataset = SharedMemoryRobotDataset(loaded)
+    dataset = SharedMemoryRobotDataset(loaded, frame_gap=frame_gap)
     train_idx, val_idx = split_by_episode(dataset)
+    if frame_gap:  # keep frame t only if frame t+frame_gap is in the same episode (samples are stored in time order)
+        episode = dataset.dataset_ids * (int(dataset.episode_indices.max()) + 1) + dataset.episode_indices
+        has_pair = np.zeros(len(episode), dtype=bool)
+        has_pair[:-frame_gap] = (episode[frame_gap:] == episode[:-frame_gap]).numpy()
+        train_idx, val_idx = train_idx[has_pair[train_idx]], val_idx[has_pair[val_idx]]
     return (_make_dataloader(dataset, train_idx, world_size, rank, batch_size, True),
             _make_dataloader(dataset, val_idx, world_size, rank, batch_size, False), loaded["lang_dim"])
 

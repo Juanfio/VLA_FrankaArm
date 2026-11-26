@@ -1,0 +1,71 @@
+JOB START: Wed Nov 25 16:38:24 CET 2026
+JOB ID: 17559740
+CPUs: 32
+DDP processes: 1
+OMP threads: 32
+Modules loaded: Wed Nov 25 16:38:39 CET 2026
+Environment activated: Wed Nov 25 16:38:41 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Wed Nov 25 16:38:41 CET 2026
+Batch size=256 (global 256), Rank=0, Local_rank=0, World_size=1, CPUs=32, OMP_THREADS=32, Available_CPUs=32, PyTorch threads: 32
+
+Vision-only Model, inverse-dynamics probe: frames t and t+10 (feature difference) -> sum of the actions at t..t+9
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+n_episodes: 150
+Total samples: 95711
+3 unique instructions
+Preprocessing time: 21.86 min, inputs (95711, 17, 384)
+epoch   0 | train 3.0269/0.1032 | val 2.6820/0.1347 | lr 4.00e-05 | 0.56 min
+epoch   1 | train 2.4828/0.1842 | val 2.5364/0.1566 | lr 7.33e-04 | 0.33 min
+epoch   2 | train 2.2890/0.2300 | val 2.5273/0.1596 | lr 9.99e-04 | 0.36 min
+epoch   3 | train 2.1605/0.2659 | val 2.5619/0.1578 | lr 9.94e-04 | 0.38 min
+epoch   4 | train 2.0603/0.2963 | val 2.6218/0.1617 | lr 9.83e-04 | 0.29 min
+epoch   5 | train 1.9760/0.3222 | val 2.6731/0.1629 | lr 9.66e-04 | 0.28 min
+epoch   6 | train 1.8996/0.3468 | val 2.7230/0.1590 | lr 9.45e-04 | 0.28 min
+epoch   7 | train 1.8352/0.3669 | val 2.7674/0.1617 | lr 9.18e-04 | 0.34 min
+epoch   8 | train 1.7816/0.3847 | val 2.8266/0.1603 | lr 8.86e-04 | 0.29 min
+epoch   9 | train 1.7236/0.4028 | val 2.8842/0.1591 | lr 8.50e-04 | 0.28 min
+epoch  10 | train 1.6789/0.4172 | val 2.9406/0.1602 | lr 8.10e-04 | 0.36 min
+epoch  11 | train 1.6356/0.4302 | val 2.9602/0.1606 | lr 7.67e-04 | 0.35 min
+epoch  12 | train 1.5921/0.4443 | val 3.0413/0.1581 | lr 7.20e-04 | 0.55 min
+epoch  13 | train 1.5563/0.4558 | val 3.0910/0.1546 | lr 6.71e-04 | 0.35 min
+epoch  14 | train 1.5189/0.4688 | val 3.1353/0.1564 | lr 6.20e-04 | 0.37 min
+epoch  15 | train 1.4840/0.4803 | val 3.1858/0.1531 | lr 5.68e-04 | 0.32 min
+epoch  16 | train 1.4469/0.4919 | val 3.2219/0.1535 | lr 5.15e-04 | 0.28 min
+epoch  17 | train 1.4197/0.5009 | val 3.2577/0.1562 | lr 4.61e-04 | 0.28 min
+epoch  18 | train 1.3883/0.5126 | val 3.2916/0.1558 | lr 4.08e-04 | 0.33 min
+epoch  19 | train 1.3685/0.5186 | val 3.3435/0.1571 | lr 3.57e-04 | 0.36 min
+epoch  20 | train 1.3388/0.5289 | val 3.3491/0.1560 | lr 3.06e-04 | 0.44 min
+epoch  21 | train 1.3168/0.5367 | val 3.4075/0.1538 | lr 2.58e-04 | 0.31 min
+epoch  22 | train 1.3029/0.5419 | val 3.4315/0.1550 | lr 2.13e-04 | 0.30 min
+epoch  23 | train 1.2828/0.5485 | val 3.4378/0.1549 | lr 1.71e-04 | 0.29 min
+epoch  24 | train 1.2681/0.5534 | val 3.4654/0.1544 | lr 1.33e-04 | 0.39 min
+epoch  25 | train 1.2582/0.5564 | val 3.4812/0.1544 | lr 9.89e-05 | 0.30 min
+epoch  26 | train 1.2503/0.5592 | val 3.4846/0.1544 | lr 6.94e-05 | 0.29 min
+epoch  27 | train 1.2435/0.5632 | val 3.4965/0.1548 | lr 4.48e-05 | 0.29 min
+epoch  28 | train 1.2376/0.5655 | val 3.4936/0.1552 | lr 2.53e-05 | 0.34 min
+epoch  29 | train 1.2372/0.5654 | val 3.4925/0.1550 | lr 1.13e-05 | 0.29 min
+epoch  30 | train 1.2356/0.5657 | val 3.4925/0.1550 | lr 2.83e-06 | 0.34 min
+Running action-bin diagnostics...
+Action 0: accuracy=0.120, majority baseline=0.074, accuracy within 1 bin=0.346, majority baseline within 1 bin=0.202, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=14
+Action 1: accuracy=0.182, majority baseline=0.080, accuracy within 1 bin=0.483, majority baseline within 1 bin=0.231, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=16
+Action 2: accuracy=0.193, majority baseline=0.080, accuracy within 1 bin=0.496, majority baseline within 1 bin=0.220, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=17
+Action 3: accuracy=0.135, majority baseline=0.072, accuracy within 1 bin=0.367, majority baseline within 1 bin=0.214, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=14
+Action 4: accuracy=0.142, majority baseline=0.132, accuracy within 1 bin=0.385, majority baseline within 1 bin=0.358, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=16
+Action 5: accuracy=0.158, majority baseline=0.138, accuracy within 1 bin=0.415, majority baseline within 1 bin=0.390, unique predicted bins=32, unique target bins=32, target bin coverage=1.000, most common predicted bin=13
+Mean over actions: accuracy=0.155, majority baseline=0.096, accuracy within 1 bin=0.416, majority baseline within 1 bin=0.269
+============ Job Information ===================================================
+Submitted: 2026-11-25T16:38:13
+Started: 2026-11-25T16:38:15
+Ended: 2026-11-25T17:15:13
+Elapsed: 37 min, Limit: 480 min, Difference: 443 min
+CPUs: 32, Nodes: 1
+Estimated credit Consumption: 19.73 core-hours
+================================================================================
