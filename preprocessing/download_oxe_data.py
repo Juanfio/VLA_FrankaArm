@@ -94,7 +94,7 @@ def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, oxe_
             dataset_grp = f.create_group(f"{data_name}")
 
             for i, episode in enumerate(dataset.take(n_episodes)):
-                print(f"Episode: {episode}")
+                print(f"Episode: {i}")
                 grp_episode = dataset_grp.create_group(f"episode_{i}")
                 steps = list(episode["steps"])
 
@@ -117,6 +117,9 @@ def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, oxe_
                     action = np.stack([s["action"].numpy() for s in steps])
                     grp_action.create_dataset("actions", data=action)
                 
+                if "state" in steps[0]["observation"]:
+                    grp_episode.create_dataset("state", data=np.stack([s["observation"]["state"].numpy() for s in steps]))
+
                 ## language
                 candidate_language_keys = _get_candidate_keys(dimension="language")
                 grp_language = grp_episode.create_group("language")
@@ -138,8 +141,6 @@ def save_hdf5_dataset(path_data: str, data_name_lst: list, n_episodes: int, oxe_
     size_bytes = file_path.stat().st_size
     print(f"Size of file {file_path}: {size_bytes / (1024 ** 2):.2f} MB")
     print(f"Size of file {file_path}: {size_bytes / (1024 ** 3):.2f} GB")
-
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
