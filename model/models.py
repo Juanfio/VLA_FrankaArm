@@ -2,6 +2,11 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+# Normalization DINOv2 was pretrained with (ImageNet RGB statistics), as in preprocessing.IMAGENET_*.
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 # Output dimension must be input dimension of language model (256 to match with OpenVLA model).
 
@@ -175,23 +180,36 @@ def _load_dinov2(model_name: str) -> nn.Module:
 class DinoV2Encoder(nn.Module):
     """
     Pretrained DINOv2 image encoder (Oquab et al. 2023) with VisionTransformer's interface:
-    forward(images, lang) -> image representation. Images must be ImageNet-normalized (DINOv2's pretraining
-    normalization) with sides divisible by the patch size 14 (224x224 -> 16x16 patches).
-    Language is not injected into the backbone; with use_lang=True the ActionHead concatenates it.
+    forward(images, lang) -> image representation. Float images must be ImageNet-normalized (DINOv2's
+    pretraining normalization) with sides divisible by the patch size 14 (224x224 -> 16x16 patches).
+    Language is not injected into the backbone; with use_lang=True the action head receives it.
 
     pooling: "cls" -> CLS token, (B, D); "cls_mean" -> CLS token + mean patch token, (B, 2D) (the feature
     DINOv2 uses for its linear-probe evaluations); "grid" -> CLS token followed by the patch tokens averaged
-    over a grid_size x grid_size grid, (B, 1 + grid_size**2, D), which keeps where things are in the image.
+    over a grid_size x grid_size grid, (B, 1 + grid_size**2, D), which keeps where things are in the image;
+    "tokens" -> CLS token followed by every patch token, (B, 1 + (img_size // 14)**2, D) = (B, 257, 384) at
+    224 px (register tokens dropped).
 
     train_blocks: with freeze=True, the last train_blocks transformer blocks and the final LayerNorm still train
     (partial fine-tuning). The frozen blocks before them then run once, in preprocessing (see cache_features).
+    freeze=False fine-tunes every block end-to-end on raw images.
+
+    Raw images: a uint8 batch (B, 3, H, W) is cropped, resized to img_size and ImageNet-normalized inside
+    forward (see prepare_images): in train mode with augment=True, a random square crop covering crop_scale of the
+    image area per sample (plus optional colour jitter); otherwise (eval mode, or augment=False) the same crop,
+    centred. Float inputs are taken as already normalized and are not augmented. Training, validation,
+    diagnostics and rollout therefore share one transform: at rollout, feed uint8 frames resized like
+    preprocessing.resize_frames_uint8, with the model in eval mode.
     """
 
     def __init__(self, model_name: str = "dinov2_vits14", freeze: bool = True, pooling: str = "cls",
-                 use_lang: bool = False, grid_size: int = 4, train_blocks: int = 0):
+                 use_lang: bool = False, grid_size: int = 4, train_blocks: int = 0, img_size: int = 224,
+                 augment: bool = False, crop_scale: float = 1.0, color_jitter: bool = False):
         super().__init__()
-        if pooling not in ("cls", "cls_mean", "grid"):
-            raise ValueError(f"pooling must be 'cls', 'cls_mean' or 'grid', got {pooling!r}")
+        if pooling not in ("cls", "cls_mean", "grid", "tokens"):
+            raise ValueError(f"pooling must be 'cls', 'cls_mean', 'grid' or 'tokens', got {pooling!r}")
+        if not 0.0 < crop_scale <= 1.0:
+            raise ValueError(f"crop_scale (fraction of the image area kept) must be in (0, 1], got {crop_scale}")
 
         self.backbone = _load_dinov2(model_name)
         depth = len(self.backbone.blocks)                               # 12 for ViT-S/14
@@ -203,15 +221,30 @@ class DinoV2Encoder(nn.Module):
         self.n_frozen = depth - train_blocks if freeze else 0           # blocks that never train
         self.pooling = pooling
         self.grid_size = grid_size
+        self.patch_size = self.backbone.patch_size
+        if img_size % self.patch_size:
+            raise ValueError(f"img_size {img_size} is not divisible by the patch size {self.patch_size}")
+        self.img_size = img_size                                        # side of the images the backbone sees
+        self.augment = augment                                          # random crops (and jitter) in train mode
+        self.crop_scale = crop_scale                                    # fraction of the image area kept by a crop
+        self.color_jitter = color_jitter                                # brightness/contrast jitter in train mode
         # identifies its cached features in preprocessed files
         self.name = (f"{model_name}-tokens_after_block{self.n_frozen}" if self.train_blocks
                      else f"{model_name}-{pooling}" + (str(grid_size) if pooling == "grid" else ""))
+        if img_size != 224:
+            self.name += f"-{img_size}px"
         self.use_lang = use_lang
-        self.patch_size = self.backbone.patch_size
         self.feature_dim = self.backbone.embed_dim                      # 384 for ViT-S/14
         self.embed_dim = self.feature_dim * (2 if pooling == "cls_mean" else 1)  # size of each output vector
-        self.n_tokens = 1 + grid_size ** 2 if pooling == "grid" else 1  # output vectors per image
+        self.n_tokens = {"grid": 1 + grid_size ** 2,                    # output vectors per image
+                         "tokens": 1 + (img_size // self.patch_size) ** 2}.get(pooling, 1)
+        # ImageNet statistics for raw images; not saved in checkpoints (persistent=False)
+        self.register_buffer("pixel_mean", torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1), persistent=False)
+        self.register_buffer("pixel_std", torch.tensor(IMAGENET_STD).view(1, 3, 1, 1), persistent=False)
 
+        # Only used for masked-image pretraining: without masks it gets no gradient, which DDP rejects.
+        if getattr(self.backbone, "mask_token", None) is not None:
+            self.backbone.mask_token.requires_grad_(False)
         if freeze:
             self.backbone.requires_grad_(False)
             self.backbone.blocks[self.n_frozen:].requires_grad_(True)  # the last train_blocks blocks
@@ -225,6 +258,50 @@ class DinoV2Encoder(nn.Module):
             self.backbone.eval()
             self.backbone.blocks[self.n_frozen:].train(mode)
         return self
+
+    def prepare_images(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Turns raw uint8 images into what the backbone expects, batched on their device: a square crop covering
+        crop_scale of the image area (random position per sample in train mode with augment=True, centred
+        otherwise), resized to img_size x img_size with one F.affine_grid + F.grid_sample call, optional
+        brightness/contrast jitter (train mode, augment and color_jitter), then /255 and ImageNet normalization.
+        All frames of one sample (5-D input) get the same crop and jitter, e.g. frames t and t+gap of a pair.
+
+            Args:
+                x: torch.Tensor
+                    (B, 3, H, W) or (B, F, 3, H, W) uint8 images.
+
+            Returns:
+                images: torch.Tensor
+                    (B, 3, img_size, img_size) or (B, F, 3, img_size, img_size) float32, ImageNet-normalized.
+        """
+        if x.dtype != torch.uint8:
+            raise TypeError(f"prepare_images expects uint8 images, got {x.dtype}")
+        lead = x.shape[:-3]                                             # (B,) or (B, F)
+        B, n_frames = lead[0], math.prod(lead[1:])                      # frames per sample (1 for single images)
+        x = x.reshape(B * n_frames, *x.shape[-3:]).float().div_(255)
+        random = self.training and self.augment
+
+        # Affine map from output to input coordinates ([-1, 1] spans the image): scale = crop side as a fraction
+        # of the image side, shift = crop centre, kept inside the image.
+        side = math.sqrt(self.crop_scale)
+        theta = torch.zeros(B, 2, 3, device=x.device)
+        theta[:, 0, 0] = theta[:, 1, 1] = side
+        if random:
+            theta[:, :, 2] = (torch.rand(B, 2, device=x.device) * 2 - 1) * (1 - side)
+        theta = theta.repeat_interleave(n_frames, dim=0)
+        grid = F.affine_grid(theta, [B * n_frames, 3, self.img_size, self.img_size], align_corners=False)
+        x = F.grid_sample(x, grid, mode="bilinear", padding_mode="border", align_corners=False)
+
+        if random and self.color_jitter:  # brightness in [0.8, 1.2], then contrast in [0.8, 1.2] (as torchvision)
+            brightness, contrast = (torch.rand(2, B, 1, 1, 1, device=x.device) * 0.4 + 0.8).repeat_interleave(
+                n_frames, dim=1)
+            x = (x * brightness).clamp_(0, 1)
+            gray = (0.299 * x[:, 0] + 0.587 * x[:, 1] + 0.114 * x[:, 2]).mean(dim=(-2, -1))[:, None, None, None]
+            x = ((x - gray) * contrast + gray).clamp_(0, 1)
+
+        x = (x - self.pixel_mean) / self.pixel_std
+        return x.reshape(*lead, 3, self.img_size, self.img_size)
 
     def _frozen_tokens(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -259,19 +336,26 @@ class DinoV2Encoder(nn.Module):
 
             Returns:
                 features: torch.Tensor
-                    The encoder output when every block is frozen (as forward). With train_blocks > 0, the tokens
-                    after the frozen blocks, (B, 1 + h*w, D) in float16 to halve memory.
+                    The encoder output when every block is frozen (as forward; pooling="tokens" in float16 to
+                    halve memory). With train_blocks > 0, the tokens after the frozen blocks, (B, 1 + h*w, D) in
+                    float16.
         """
-        return self._frozen_tokens(x).half() if self.train_blocks else self(x)
+        if self.train_blocks:
+            return self._frozen_tokens(x).half()
+        features = self(x)
+        return features.half() if self.pooling == "tokens" else features
 
     def forward(self, x: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
         """
-        x: (B, 3, H, W) ImageNet-normalized images, H and W divisible by 14, or what cache_features returned.
+        x: (B, 3, H, W) uint8 raw images (cropped and normalized here, see prepare_images), (B, 3, H, W)
+        ImageNet-normalized float images with H and W divisible by 14, or what cache_features returned.
         lang: ignored here (see class docstring).
-        Returns: (B, embed_dim), or (B, n_tokens, embed_dim) for pooling="grid".
+        Returns: (B, embed_dim), or (B, n_tokens, embed_dim) for pooling="grid" or "tokens".
         """
+        if x.dtype == torch.uint8:
+            x = self.prepare_images(x)                                  # (B, 3, img_size, img_size)
         if x.dim() != 4 and not self.train_blocks:
-            return x                                                    # final features cached in preprocessing
+            return x.float()                                            # final features cached in preprocessing
         hw = (x.shape[-2] // self.patch_size, x.shape[-1] // self.patch_size) if x.dim() == 4 else None
         x = self._frozen_tokens(x) if x.dim() == 4 else x.float()       # (B, 1 + h*w, D)
         for block in self.backbone.blocks[self.n_frozen:]:              # trainable blocks
@@ -282,6 +366,8 @@ class DinoV2Encoder(nn.Module):
         if self.pooling == "cls":
             return cls_token
         patches = x[:, 1 + self.backbone.num_register_tokens:]          # (B, h*w, D), row by row
+        if self.pooling == "tokens":
+            return torch.cat([cls_token[:, None], patches], dim=1)      # (B, 1 + h*w, D)
         if self.pooling == "cls_mean":
             return torch.cat([cls_token, patches.mean(dim=1)], dim=-1)  # (B, 2D)
         B, N, D = patches.shape
@@ -349,6 +435,92 @@ class ActionHead(nn.Module):
         return self.mlp(x).view(y.shape[0], self.action_dim, self.n_bins)
 
 
+class ActionQueryHead(nn.Module):
+    """
+    Action head reading every image token: one learnable query per action dimension cross-attends to the
+    tokens in a small Transformer decoder (pre-norm, GELU), then a shared linear layer maps each query to logits
+    over the n_bins action bins. Same forward(y, lang) interface and use_lang attribute as ActionHead.
+
+        Args:
+            embed_dim: int
+                width of the image tokens (384 for DINOv2 ViT-S/14).
+            n_tokens: int
+                tokens per image (257 for DINOv2 pooling="tokens" at 224 px), for the position embedding.
+            action_dim: int
+                number of action dimensions, one query each.
+            n_bins: int
+                discretized bins per action dimension.
+            hidden_dim: int
+                width of the decoder (tokens are projected to it).
+            n_layers: int
+                decoder layers.
+            n_heads: int
+                attention heads per layer (hidden_dim must be divisible by it).
+            dropout: float
+                dropout inside the decoder layers.
+            use_lang: bool
+                append the projected language embedding as one extra token (untested hook, off by default).
+            lang_dim: int
+                size of the language embedding when use_lang=True.
+
+        Attributes:
+            input_proj: nn.Sequential
+                LayerNorm + Linear(embed_dim, hidden_dim) applied to every token.
+            pos_embed: nn.Parameter
+                (1, n_tokens, hidden_dim) learned position embedding added to the projected tokens.
+            queries: nn.Parameter
+                (1, action_dim, hidden_dim) learnable action queries.
+            lang_proj: nn.Linear | None
+                Linear(lang_dim, hidden_dim) for the optional language token, None without language.
+            decoder: nn.TransformerDecoder
+                n_layers pre-norm decoder layers: query self-attention, cross-attention to the tokens, MLP.
+            out: nn.Linear
+                Linear(hidden_dim, n_bins) shared by all queries.
+            action_dim, n_bins, use_lang: int, int, bool
+                as the arguments.
+    """
+
+    def __init__(self, embed_dim: int, n_tokens: int, action_dim: int = 6, n_bins: int = 32, hidden_dim: int = 256,
+                 n_layers: int = 2, n_heads: int = 8, dropout: float = 0.0, use_lang: bool = False,
+                 lang_dim: int = 384):
+        super().__init__()
+        if hidden_dim % n_heads:
+            raise ValueError(f"hidden_dim {hidden_dim} must be divisible by n_heads {n_heads}")
+        self.action_dim = action_dim
+        self.n_bins = n_bins
+        self.use_lang = use_lang
+        self.input_proj = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, hidden_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, n_tokens, hidden_dim))
+        self.queries = nn.Parameter(torch.zeros(1, action_dim, hidden_dim))
+        self.lang_proj = nn.Linear(lang_dim, hidden_dim) if use_lang else None
+        layer = nn.TransformerDecoderLayer(hidden_dim, n_heads, dim_feedforward=4 * hidden_dim, dropout=dropout,
+                                           activation="gelu", batch_first=True, norm_first=True)
+        self.decoder = nn.TransformerDecoder(layer, n_layers, norm=nn.LayerNorm(hidden_dim))
+        self.out = nn.Linear(hidden_dim, n_bins)
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        nn.init.trunc_normal_(self.queries, std=0.02)
+
+    def forward(self, y: torch.Tensor, lang: torch.Tensor | None = None) -> torch.Tensor:
+        """
+        Predicts per-dimension action-bin logits from the image tokens.
+
+            Args:
+                y: torch.Tensor
+                    (B, n_tokens, embed_dim) image tokens.
+                lang: torch.Tensor | None
+                    (B, lang_dim) language embedding, used only when use_lang=True.
+
+            Returns:
+                logits: torch.Tensor
+                    (B, action_dim, n_bins), one softmax per action dimension.
+        """
+        memory = self.input_proj(y) + self.pos_embed                    # (B, T, hidden_dim)
+        if self.use_lang and lang is not None:                          # optional language token (untested hook)
+            memory = torch.cat([memory, self.lang_proj(lang)[:, None]], dim=1)
+        x = self.decoder(self.queries.expand(len(y), -1, -1), memory)  # (B, action_dim, hidden_dim)
+        return self.out(x)                                              # (B, action_dim, n_bins)
+
+
 class RoboticActionModel(nn.Module):
     """
     ViT image encoder + action head.
@@ -362,7 +534,7 @@ class RoboticActionModel(nn.Module):
       f(t+gap) - f(t) (built for embed_dim), so it sees what the actions between the two frames did.
     """
 
-    def __init__(self, vit: VisionTransformer | DinoV2Encoder, action_heads: dict[str, ActionHead],
+    def __init__(self, vit: VisionTransformer | DinoV2Encoder, action_heads: dict[str, ActionHead | ActionQueryHead],
                  n_frames: int = 1, frame_diff: bool = False):
         super().__init__()
         self.vit = vit
@@ -385,6 +557,8 @@ class RoboticActionModel(nn.Module):
         # images: (B, 3, H, W), or what a frozen DINOv2 encoder cached in preprocessing (it handles both);
         # with n_frames > 1 a frame dimension follows the batch: (B, n_frames, ...)
         if self.n_frames > 1:  # encode each frame, then subtract the features or concatenate them (last dimension)
+            if images.dtype == torch.uint8 and isinstance(self.vit, DinoV2Encoder):
+                images = self.vit.prepare_images(images)  # raw frames: one crop per sample, shared by its frames
             features = [self.vit(images[:, i], lang) for i in range(self.n_frames)]
             y = features[1] - features[0] if self.frame_diff else torch.cat(features, dim=-1)
         else:

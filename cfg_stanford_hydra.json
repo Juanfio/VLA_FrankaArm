@@ -20,13 +20,20 @@
     "renaming_keys": {},
     "model_parameters":{
         "encoder": "dinov2_vits14",
-        "freeze_encoder": true,
+        "freeze_encoder": false,
         "train_blocks": 0,
-        "inverse_dynamics": true,
+        "inverse_dynamics": false,
         "frame_gap": 10,
         "frame_input": "diff",
-        "pooling": "grid",
+        "pooling": "tokens",
         "grid_size": 4,
+        "head": "queries",
+        "head_dim": 256,
+        "head_layers": 2,
+        "head_heads": 8,
+        "augment": true,
+        "crop_scale": 0.9,
+        "color_jitter": false,
         "img_size": 224,
         "patch_size": 16,
         "in_channels": 3,
@@ -38,9 +45,9 @@
         "use_lang": false
     },
 
-    "batch_size": 256,
-    "learning_rate": 1e-3,
-    "encoder_learning_rate": 1e-4,
+    "batch_size": 64,
+    "learning_rate": 1e-4,
+    "encoder_learning_rate": 2e-5,
     "lr_schedule": "cosine",
     "warmup_frac": 0.05,
     "weight_decay": 0.01,
@@ -48,5 +55,5 @@
     "class_weights": false,
     "overfit_samples": 0,
     "save_checkpoint": false,
-    "model_filename": "stanford_hydra-150_episodes-dinov2_vits14-frozen-grid4-inverse_dynamics-gap10_diff_sum-cosine_lr1e-3-bs256"
+    "model_filename": "stanford_hydra-150_episodes-dinov2_vits14-full_ft-tokens-queries256x2-crop0.9-cosine_lr1e-4-enclr2e-5-bs64"
 }

@@ -1,8 +1,9 @@
 import os
 import time
+from contextlib import nullcontext
 from functools import partial
 
-from .models import VisionTransformer, DinoV2Encoder, ActionHead, RoboticActionModel
+from .models import VisionTransformer, DinoV2Encoder, ActionHead, ActionQueryHead, RoboticActionModel
 from preprocessing.preprocessing import get_dataloaders_oxe, compute_action_class_weights, make_fixed_overfit_loaders
 from preprocessing.utils import get_settings
 
@@ -33,7 +34,11 @@ def get_model(parameters: dict):
         vit = DinoV2Encoder(model_name=encoder, freeze=parameters.get("freeze_encoder", True),
                             pooling=parameters.get("pooling", "cls"), use_lang=use_lang,
                             grid_size=parameters.get("grid_size", 4),
-                            train_blocks=parameters.get("train_blocks", 0))  # last blocks that still train
+                            train_blocks=parameters.get("train_blocks", 0),  # last blocks that still train
+                            img_size=parameters.get("img_size", 224),
+                            augment=parameters.get("augment", False),       # raw uint8 images only
+                            crop_scale=parameters.get("crop_scale", 1.0),
+                            color_jitter=parameters.get("color_jitter", False))
         embed_dim = vit.embed_dim  # set by the backbone, not by the config
     else:
         embed_dim = parameters["embed_dim"]
@@ -52,10 +57,38 @@ def get_model(parameters: dict):
         raise ValueError(f"frame_input must be 'concat' or 'diff', got {frame_input!r}.")
     n_frames = 2 if inverse_dynamics else 1
     frame_diff = inverse_dynamics and frame_input == "diff"  # f(t+gap) - f(t) keeps one frame's feature width
-    head = ActionHead(embed_dim=embed_dim * (1 if frame_diff else n_frames), action_dim=6, use_lang=use_lang,
-                      lang_dim=lang_dim, dropout=dropout,
-                      n_tokens=getattr(vit, "n_tokens", 1))  # several tokens: pooled by attention
+    head_input = embed_dim * (1 if frame_diff else n_frames)
+    n_tokens = getattr(vit, "n_tokens", 1)  # vectors per image: 257 for pooling "tokens", 17 for "grid"
+    head_type = parameters.get("head", "mlp")
+    if head_type == "mlp":  # attention pooling (several tokens) + MLP
+        head = ActionHead(embed_dim=head_input, action_dim=6, n_bins=N_BINS, use_lang=use_lang, lang_dim=lang_dim,
+                          dropout=dropout, n_tokens=n_tokens)
+    elif head_type == "queries":  # one learnable query per action dimension cross-attends to every token
+        if n_tokens == 1:
+            raise ValueError("head 'queries' needs several tokens per image (DINOv2 pooling 'tokens' or 'grid'), "
+                             "but this encoder gives 1 (pooling 'cls'/'cls_mean' or the from-scratch ViT).")
+        head = ActionQueryHead(embed_dim=head_input, n_tokens=n_tokens, action_dim=6, n_bins=N_BINS,
+                               hidden_dim=parameters.get("head_dim", 256), n_layers=parameters.get("head_layers", 2),
+                               n_heads=parameters.get("head_heads", 8), dropout=dropout, use_lang=use_lang,
+                               lang_dim=lang_dim)
+    else:
+        raise ValueError(f"head must be 'mlp' or 'queries', got {head_type!r}.")
     return RoboticActionModel(vit, {HYDRA: head}, n_frames=n_frames, frame_diff=frame_diff)
+
+
+def autocast_context(device):
+    """
+    Mixed precision for the forward pass: bfloat16 autocast on CUDA (no gradient scaler needed), nothing on CPU.
+
+        Args:
+            device: torch.device
+                device the model runs on.
+
+        Returns:
+            context: contextlib.AbstractContextManager
+                torch.autocast(device_type="cuda", dtype=torch.bfloat16) on CUDA, otherwise a no-op context.
+    """
+    return torch.autocast(device_type="cuda", dtype=torch.bfloat16) if device.type == "cuda" else nullcontext()
 
 
 def action_ce_loss(logits, targets, class_weights=None, label_smoothing=0.0):
@@ -80,7 +113,7 @@ def run_one_epoch(model, loader, device, loss_fn, optimizer=None, scheduler=None
 
     with torch.set_grad_enabled(is_train):
         for batch in loader:
-            images = batch["image"].to(device)  # images, or the cached features of a frozen encoder
+            images = batch["image"].to(device, non_blocking=True)  # images (uint8: raw) or cached features
             language = batch["language_embedding"].to(device) if use_lang else None
             targets = batch["actions"].to(device).long()
             dataset_names = batch["dataset_name"]
@@ -88,8 +121,10 @@ def run_one_epoch(model, loader, device, loss_fn, optimizer=None, scheduler=None
             batch_loss, batch_n = 0.0, 0
             for dataset_name in set(dataset_names):  # one action head per dataset
                 idx = torch.tensor([n == dataset_name for n in dataset_names], device=device).nonzero(as_tuple=True)[0]
-                logits = model(images[idx], language[idx] if language is not None else None, dataset_name=dataset_name)
-                loss = loss_fn(logits, targets[idx])
+                with autocast_context(device):
+                    logits = model(images[idx], language[idx] if language is not None else None,
+                                   dataset_name=dataset_name)
+                    loss = loss_fn(logits, targets[idx])
                 b = len(idx)
                 batch_loss += loss * b
                 batch_n += b
@@ -128,9 +163,10 @@ def diagnose_action_bins(model, loader, device, n_actions=6, n_bins=N_BINS):
         language = batch["language_embedding"] if base_model.vit.use_lang else None
         for dataset_name in set(batch["dataset_name"]):
             idx = torch.tensor([n == dataset_name for n in batch["dataset_name"]]).nonzero(as_tuple=True)[0]
-            logits = base_model(batch["image"][idx].to(device),
-                                language[idx].to(device) if language is not None else None,
-                                dataset_name=dataset_name)
+            with autocast_context(device):
+                logits = base_model(batch["image"][idx].to(device),
+                                    language[idx].to(device) if language is not None else None,
+                                    dataset_name=dataset_name)
             p, t = logits.argmax(dim=-1).cpu(), batch["actions"][idx].long()
             error = (p - t).abs()
             correct += torch.stack([(error == 0).sum(0), (error <= 1).sum(0)])
@@ -176,7 +212,7 @@ def diagnose_action_bins(model, loader, device, n_actions=6, n_bins=N_BINS):
 
 
 def setup_distributed_training():
-
+    """NCCL on GPUs (one per process, chosen by LOCAL_RANK), Gloo on CPUs. Returns (local_rank, world_size)."""
     local_rank = int(os.environ.get("LOCAL_RANK", 0))
     rank = int(os.environ.get("RANK", 0))
     world_size = int(os.environ.get("WORLD_SIZE", 1))
@@ -184,11 +220,13 @@ def setup_distributed_training():
     os.environ.setdefault("MASTER_ADDR", "localhost")
     os.environ.setdefault("MASTER_PORT", "29500")
 
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)  # before any collective, so every process talks from its own GPU
     if not dist.is_initialized():
         dist.init_process_group(
-            backend="gloo",
+            backend="nccl" if torch.cuda.is_available() else "gloo",
             init_method="env://",
-            timeout=timedelta(minutes=30)
+            timeout=timedelta(hours=2)  # other ranks wait at a barrier while rank 0 preprocesses
         )
 
     return local_rank, world_size
@@ -212,7 +250,7 @@ def train(model, train_loader, val_loader, device, settings, num_epochs, world_s
 
     model = model.to(device)
     if class_weights is not None: class_weights = class_weights.to(device)
-    if use_ddp: model = DDP(model, device_ids=None, output_device=None)
+    if use_ddp: model = DDP(model, device_ids=[device.index] if device.type == "cuda" else None)
 
     base_model = model.module if use_ddp else model
     loss_fn = partial(action_ce_loss, class_weights=class_weights, label_smoothing=settings.get("label_smoothing", 0.0))
@@ -340,12 +378,15 @@ if __name__ == "__main__":
               + (f", inverse-dynamics probe: frames t and t+{frame_gap} ({combined}) -> {target}"
                  if frame_gap else ""), flush=True)
     model = get_model(parameters)  # before the data, so that preprocessing can use a frozen encoder
-    device = torch.device(f"cuda:{local_rank}" if args.use_ddp and torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
     # A frozen encoder gives the same features in every epoch: preprocessing replaces each episode's frames by
     # their features right after reading them (never holding all images), then training only updates the head
     # (with train_blocks > 0: the features are the tokens after the frozen blocks, and the last blocks train too).
+    # A DINOv2 encoder fine-tuned end-to-end (freeze_encoder: false) instead runs on every step: the dataset then
+    # holds uint8 frames, which the encoder crops (randomly in training), resizes and normalizes on the device.
     frozen = isinstance(model.vit, DinoV2Encoder) and model.vit.freeze
+    raw_images = isinstance(model.vit, DinoV2Encoder) and not model.vit.freeze
     t0 = time.perf_counter() # keep track of time taken by preprocessing and training.
     train_loader, val_loader, lang_dim = get_dataloaders_oxe(
         cfg=args.settings, n_bins=N_BINS,
@@ -359,6 +400,7 @@ if __name__ == "__main__":
         preprocessed_path=args.preprocessed_path,
         image_encoder=model.vit.to(device) if frozen else None,
         frame_gap=frame_gap,  # samples hold frames t and t+frame_gap, targets the summed actions in between
+        raw_images=raw_images,
     )
     if rank == 0:
         # # do features change between consecutive frames?
@@ -372,7 +414,8 @@ if __name__ == "__main__":
         #     cos = F.cosine_similarity(f[k:][same], f[:-k][same], dim=1)
         #     print(f"gap {k:2d}: mean cosine {cos.mean():.4f}, identical {(cos > 0.9999).float().mean():.1%}")
         print(f"Preprocessing time: {(time.perf_counter() - t0) / 60:.2f} min, "
-                        f"inputs {tuple(train_loader.dataset.dataset.images.shape)}", flush=True)
+              f"inputs {tuple(train_loader.dataset.dataset.images.shape)} "
+              f"{train_loader.dataset.dataset.images.dtype}", flush=True)
     if parameters["use_lang"] and lang_dim != parameters.get("lang_dim", 384):
         raise ValueError(f"Language embeddings have {lang_dim} values, the model expects {parameters.get('lang_dim', 384)}.")
 

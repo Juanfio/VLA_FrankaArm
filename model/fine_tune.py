@@ -255,16 +255,21 @@ if __name__ == "__main__":
     keys_to_keep = settings["keys_to_keep"]
     renaming_keys = settings["renaming_keys"]
 
+    # A DINOv2 encoder fine-tuned end-to-end was trained on raw uint8 frames, which it crops and normalizes
+    # itself (centre crop in eval mode); the simulated frames must go through the same transform.
+    parameters = settings["model_parameters"]
+    raw_images = (parameters.get("encoder", "vit").startswith("dinov2")
+                  and not parameters.get("freeze_encoder", True))
     sim_train_loader, sim_val_loader, lang_dim = get_dataloaders_sim(cfg=args.settings,
         n_bins=N_BINS,
         keys_to_keep=keys_to_keep,
         renaming_keys=renaming_keys,
-        batch_size=BATCH_SIZE)
+        batch_size=BATCH_SIZE,
+        raw_images=raw_images)
 
     # load the pretrained checkpoint (encoder + hydra/taco_play heads) first
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(str(Path(__file__).resolve().parent.parent) + "/data/best_model.pt", map_location=device)
-    parameters = settings["model_parameters"]
     parameters["lang_dim"] = lang_dim
     model = get_model(parameters)
     model.load_state_dict(checkpoint["model_state_dict"])

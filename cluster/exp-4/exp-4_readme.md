@@ -10,7 +10,9 @@
 | stanford_hydra-17515265.out | Implement fine tuning of the last two blocks of the DinoV2 ViT-S/14 model. No improvement in performance in validation data. |
 | stanford_hydra-17550111.out | Give the same head the features of frames t and t+1 from the same episode and predict the action at t. The model sees what the action did. Should performance not be improved: the labels and pipeline are the problem. I should Check that frames and actions line up within each episode. Look at what lands in the middle bins, and remove no-op actions. If single-step deltas are smaller than the camera can show, predict the sum of the next k deltas instead. with next_frame=True, each sample's image is the slice of frames t and t+1. No fine tuning is enabled, train_blocks = 0. Taking out the fine-tuning of the last two blocks sped-up the time per epoch.| 
 | stanford_hydra-17557209.out | Implement in train.py the cosine similarity between consecutive frames to see whether features change across steps. Your labels are fine, but one step of motion barely changes the frozen features: about 3% of the distance between unrelated frames (1 − 0.991 vs. 1 − 0.66), against about 13% over 10 steps, so single-step actions are nearly invisible to the model.| 
-| ... | Adapt preprocessing, models and train scripts to incorporate this change: Rerun the probe on frames t and t+10, with the feature difference f(t+10) − f(t) as input, predicting the summed 10-step action.  |
+| stanford_hydra-17559740.out | Adapt preprocessing, models and train scripts to incorporate this change: Rerun the probe on frames t and t+10, with the feature difference f(t+10) − f(t) as input, predicting the summed 10-step action. |
+| ... | ... |
+
 | ... | ... |
          
 

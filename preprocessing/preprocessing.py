@@ -14,6 +14,10 @@ N_BINS = 32
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 LOCAL_MODEL_DIR = Path(__file__).resolve().parent / "language_models" / "all-MiniLM-L6-v2"
+# Raw frames for end-to-end fine-tuning are stored as uint8 (3, RAW_IMAGE_SIZE, RAW_IMAGE_SIZE); the model crops
+# and normalizes them (DinoV2Encoder.prepare_images). The tag marks such preprocessed files.
+RAW_IMAGE_SIZE = 224
+RAW_IMAGES_TAG = f"raw_uint8_{RAW_IMAGE_SIZE}"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data Loading
@@ -41,13 +45,18 @@ def sum_next_actions(actions, horizon):
     return (c[np.minimum(np.arange(T) + horizon, T)] - c[:T]).astype(actions.dtype)
 
 
-def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image_encoder=None, action_horizon=1):
+def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image_encoder=None, action_horizon=1,
+                          raw_images=False):
     """
     Load combined dataset from HDF5, returns list[dict] and metadata. With image_encoder, each episode's frames
     are replaced by their features (see encode_frames) right after reading, so the images of all episodes
     are never in memory together. With action_horizon > 1, each step's continuous actions are replaced by
     their sum over the next action_horizon steps of the episode (see sum_next_actions), before discretization.
+    With raw_images=True (end-to-end fine-tuning), each episode's frames are resized right after reading to
+    uint8 (3, RAW_IMAGE_SIZE, RAW_IMAGE_SIZE) tensors, not normalized (see resize_frames_uint8).
     """
+    if raw_images and image_encoder is not None:
+        raise ValueError("raw_images=True stores frames for an encoder that trains; it excludes image_encoder.")
     import h5py
     data, metadata = [], {}
     with h5py.File(f"{path_data}/{oxe_dataset_name}.h5", "r") as f:
@@ -61,8 +70,7 @@ def open_combined_dataset(path_data, oxe_dataset_name, data_name_lst=None, image
             print(f"n_episodes: {len(grp.keys())}")
             for ep_idx, ep_key in enumerate(grp.keys()):
                 g = grp[ep_key]
-                images = {k: g["images"][k][:] if image_encoder is None else encode_frames(g["images"][k][:], image_encoder)
-                          for k in g["images"].keys()}
+                images = {k: read_frames(g["images"][k], image_encoder, raw_images) for k in g["images"].keys()}
                 actions = {k: sum_next_actions(g["actions"][k][:], action_horizon)  # horizon 1: unchanged
                            for k in g["actions"].keys()}
                 lang = {k: g["language"][k][:] for k in g["language"].keys()}
@@ -198,8 +206,60 @@ def prepare_frames(frames, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
 def encode_frames(frames, image_encoder, batch_size=256):
     """Frames (T, H, W, C) -> what a frozen DinoV2Encoder caches per frame (its cache_features), batch by batch."""
     device = next(image_encoder.parameters()).device
-    return torch.cat([image_encoder.cache_features(prepare_frames(frames[i:i + batch_size]).to(device)).cpu()
+    out_dim = getattr(image_encoder, "img_size", 224)
+    return torch.cat([image_encoder.cache_features(prepare_frames(frames[i:i + batch_size], out_dim).to(device)).cpu()
                       for i in range(0, len(frames), batch_size)])
+
+
+def resize_frames_uint8(frames, out_dim=RAW_IMAGE_SIZE, batch_size=256):
+    """
+    Resizes raw frames to out_dim x out_dim (bilinear, as prepare_frames) and keeps them uint8 in CHW layout,
+    without normalization: 4x less memory than float32. Used for end-to-end fine-tuning and at rollout; the model
+    crops and normalizes them (DinoV2Encoder.prepare_images).
+
+        Args:
+            frames: np.ndarray
+                (T, H, W, 3) uint8 frames.
+            out_dim: int
+                side of the resized frames.
+            batch_size: int
+                frames resized at once (bounds the float32 working memory).
+
+        Returns:
+            resized: torch.Tensor
+                (T, 3, out_dim, out_dim) uint8.
+    """
+    from torchvision import transforms
+    if frames.dtype != np.uint8:
+        raise TypeError(f"resize_frames_uint8 expects uint8 frames, got {frames.dtype}")
+    resize = transforms.Resize((out_dim, out_dim), interpolation=transforms.InterpolationMode.BILINEAR)
+    out = []
+    for i in range(0, len(frames), batch_size):
+        x = torch.from_numpy(np.ascontiguousarray(frames[i:i + batch_size])).permute(0, 3, 1, 2).float()
+        out.append(resize(x).round_().clamp_(0, 255).to(torch.uint8))
+    return torch.cat(out)
+
+
+def read_frames(dataset, image_encoder=None, raw_images=False):
+    """
+    Reads one episode's frames from HDF5 and turns them into what the dataset stores.
+
+        Args:
+            dataset: h5py.Dataset
+                (T, H, W, 3) uint8 frames of one episode.
+            image_encoder: DinoV2Encoder | None
+                frozen encoder: the frames are replaced by its cache_features (see encode_frames).
+            raw_images: bool
+                resize to uint8 (3, RAW_IMAGE_SIZE, RAW_IMAGE_SIZE) for end-to-end fine-tuning.
+
+        Returns:
+            frames: np.ndarray | torch.Tensor
+                the raw frames (neither option), the encoder's features, or the resized uint8 frames.
+    """
+    frames = dataset[:]
+    if image_encoder is not None:
+        return encode_frames(frames, image_encoder)
+    return resize_frames_uint8(frames) if raw_images else frames
 
 
 def image_resizing(data, out_dim=224, mean=IMAGENET_MEAN, std=IMAGENET_STD):
@@ -364,7 +424,8 @@ class DistributedWeightedSampler:
 
 def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=None,
                         batch_size=32, data_name_lst=None, use_ddp=False,
-                        local_rank=0, world_size=1, preprocessed_path=None, image_encoder=None, frame_gap=0):
+                        local_rank=0, world_size=1, preprocessed_path=None, image_encoder=None, frame_gap=0,
+                        raw_images=False):
     """
     Build OXE train/val dataloaders, single-process or DDP. Only global rank 0 preprocesses. A single process
     keeps the result in memory; with several processes, or when preprocessed_path is given, it is written to
@@ -373,7 +434,8 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     computed episode by episode while reading. With frame_gap > 0 (inverse-dynamics probe), each sample holds
     frames t and t+frame_gap of an episode, and its target is the sum of the actions at t, ..., t+frame_gap-1
     (summed before discretization, so the bins span the summed actions); each episode's last frame_gap frames
-    are left out as first frames.
+    are left out as first frames. With raw_images=True (an encoder fine-tuned end-to-end) the dataset holds
+    uint8 frames (3, 224, 224), tagged RAW_IMAGES_TAG; the model crops and normalizes them.
     """
     if frame_gap < 0:
         raise ValueError(f"frame_gap must be >= 0, got {frame_gap}.")
@@ -386,20 +448,25 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     rank = dist.get_rank() if use_ddp else 0
     dataset_path = Path(preprocessed_path or "./preprocessed_data/preprocessed_dataset.pt")
 
-    features = None if image_encoder is None else image_encoder.name  # None: the dataset holds images
+    if raw_images and image_encoder is not None:
+        raise ValueError("raw_images=True stores frames for an encoder that trains; it excludes image_encoder.")
+    # what the dataset holds: None -> normalized float images, else raw uint8 frames or a frozen encoder's features
+    features = RAW_IMAGES_TAG if raw_images else None if image_encoder is None else image_encoder.name
     action_horizon = max(frame_gap, 1)  # frame pairs: the target sums the actions between the two frames
 
     loaded = None
     if rank == 0 and not (preprocessed_path and dataset_path.exists()):
-        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst, image_encoder, action_horizon)
+        data, metadata = open_combined_dataset(path_data, oxe_name, data_name_lst, image_encoder, action_horizon,
+                                               raw_images)
         print(f"Total samples: {len(data)}", flush=True)
         data, action_pct = apply_discretization(data, metadata, n_bins)
         data = filter_keys(data, keys_to_keep, renaming_keys)
-        if image_encoder is None:
+        if image_encoder is None and not raw_images:
             data = image_resizing(data)
         data, lang_dim, _ = add_language_embeddings(data)
         loaded = {**_build_shared_data(data, metadata), "metadata": metadata, "action_percentiles": action_pct,
-                  "lang_dim": lang_dim, "image_normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD},
+                  "lang_dim": lang_dim,
+                  "image_normalization": "in_model" if raw_images else {"mean": IMAGENET_MEAN, "std": IMAGENET_STD},
                   "image_features": features, "action_horizon": action_horizon}
         del data  # release the per-sample copies
         if world_size > 1 or preprocessed_path:
@@ -412,15 +479,21 @@ def get_dataloaders_oxe(cfg, n_bins=N_BINS, keys_to_keep=None, renaming_keys=Non
     if loaded is None:
         loaded = torch.load(str(dataset_path), map_location="cpu", mmap=True, weights_only=False)
 
-    # Files written before the switch to fixed ImageNet normalization lack this key
-    # and hold per-episode-normalized images, which the DINOv2 encoder must not see.
-    norm = loaded.get("image_normalization")
-    if norm is None or tuple(norm["mean"]) != IMAGENET_MEAN or tuple(norm["std"]) != IMAGENET_STD:
-        raise ValueError(f"{dataset_path} was preprocessed with image normalization {norm}, expected mean "
-                         f"{IMAGENET_MEAN} and std {IMAGENET_STD}. Delete it or run without --preprocessed_path.")
     if loaded.get("image_features") != features:
         raise ValueError(f"{dataset_path} holds {loaded.get('image_features') or 'images'}, but this run needs "
                          f"{features or 'images'}. Delete it or run without --preprocessed_path.")
+    # Files written before the switch to fixed ImageNet normalization lack this key
+    # and hold per-episode-normalized images, which the DINOv2 encoder must not see.
+    # Raw uint8 frames are normalized in the model instead ("in_model").
+    norm = loaded.get("image_normalization")
+    if raw_images:
+        if norm != "in_model":
+            raise ValueError(f"{dataset_path} holds images normalized with {norm}, but this run needs raw uint8 "
+                             f"frames. Delete it or run without --preprocessed_path.")
+    elif (not isinstance(norm, dict) or tuple(norm["mean"]) != IMAGENET_MEAN
+          or tuple(norm["std"]) != IMAGENET_STD):
+        raise ValueError(f"{dataset_path} was preprocessed with image normalization {norm}, expected mean "
+                         f"{IMAGENET_MEAN} and std {IMAGENET_STD}. Delete it or run without --preprocessed_path.")
     if loaded.get("action_horizon", 1) != action_horizon:  # files written before frame_gap hold single actions
         raise ValueError(f"{dataset_path} holds actions summed over {loaded.get('action_horizon', 1)} steps, but this "
                          f"run needs {action_horizon}. Delete it or run without --preprocessed_path.")
@@ -441,7 +514,7 @@ def _build_shared_data(data, metadata):
     names = list(metadata.keys())
     name_to_id = {n: i for i, n in enumerate(names)}
     return {
-        "images": torch.stack([s["image"] for s in data]),  # float16 tokens of a partly fine-tuned DINOv2 stay so
+        "images": torch.stack([s["image"] for s in data]),  # keeps the dtype: uint8 frames, float16 tokens
         "actions": torch.as_tensor(np.stack([s["actions"] for s in data]), dtype=torch.int64),
         "language_embeddings": torch.stack([s["language_embedding"] for s in data]).float(),
         "dataset_ids": torch.tensor([name_to_id[s["dataset_name"]] for s in data], dtype=torch.int64),
@@ -520,8 +593,12 @@ def get_action_percentiles(sim_data):
     return stacked, {"simulated": {"actions": {"p1": p1, "p99": p99}}}
 
 
-def get_dataloaders_sim(cfg="cfg.json", n_bins=N_BINS, keys_to_keep=None, renaming_keys=None, batch_size=16):
-    """Build dataloaders for simulated dataset fine-tuning."""
+def get_dataloaders_sim(cfg="cfg.json", n_bins=N_BINS, keys_to_keep=None, renaming_keys=None, batch_size=16,
+                        raw_images=False):
+    """
+    Build dataloaders for simulated dataset fine-tuning. raw_images=True keeps uint8 frames (3, 224, 224) for a
+    DINOv2 encoder fine-tuned end-to-end, which crops and normalizes them itself (as for the OXE data).
+    """
     settings = get_settings(settings=str(Path(__file__).resolve().parent.parent / f"{cfg}"))
     sim_path = Path(__file__).resolve().parent.parent / "data" / settings["data_name_sim"]
     sim_data, sim_meta = load_sim_demos(sim_path)
@@ -532,7 +609,11 @@ def get_dataloaders_sim(cfg="cfg.json", n_bins=N_BINS, keys_to_keep=None, renami
     sim_data = [dict(s) for s in sim_data]
     for s, d in zip(sim_data, discretize(stacked, p1, p99, n_bins).reshape(len(sim_data), -1)):
         s["actions"] = d.squeeze()
-    sim_data = image_resizing(sim_data, 224)
+    if raw_images:
+        for s in sim_data:
+            s["image"] = resize_frames_uint8(s["image"][None])[0]
+    else:
+        sim_data = image_resizing(sim_data, 224)
     sim_data = filter_keys(sim_data, keys_to_keep or {}, renaming_keys={"simulated": []})
     sim_data, lang_dim, _ = add_language_embeddings(sim_data)
     sim_train, sim_val = split_by_episode(sim_data)

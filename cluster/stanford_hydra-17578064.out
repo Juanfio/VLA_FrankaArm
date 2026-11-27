@@ -1,0 +1,59 @@
+JOB START: Thu Nov 26 11:17:16 CET 2026
+JOB ID: 17578064
+CPUs: 32
+DDP processes: 1
+OMP threads: 32
+Modules loaded: Thu Nov 26 11:17:19 CET 2026
+Environment activated: Thu Nov 26 11:17:19 CET 2026
+/mnt/vast-standard/home/fiorenza/u24781/.project/dir.project/users/fiorenza/conda_envs/robotic/bin/python
+Python 3.10.20
+Launching torchrun: Thu Nov 26 11:17:19 CET 2026
+Batch size=64 (global 64), Rank=0, Local_rank=0, World_size=1, CPUs=32, OMP_THREADS=32, Available_CPUs=32, PyTorch threads: 32
+
+Vision-only Model
+Using cache found in /user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/user/fiorenza/u24781/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+n_episodes: 150
+Total samples: 95711
+3 unique instructions
+Preprocessing time: 11.04 min, inputs (95711, 3, 224, 224) torch.uint8
+epoch   0 | train 2.9213/0.1454 | val 2.7453/0.1636 | lr 4.00e-06 | 68.39 min
+epoch   1 | train 2.6047/0.1805 | val 2.5670/0.1774 | lr 7.32e-05 | 60.05 min
+epoch   2 | train 2.4800/0.1971 | val 2.5359/0.1844 | lr 9.99e-05 | 58.54 min
+epoch   3 | train 2.4181/0.2085 | val 2.5099/0.1866 | lr 9.94e-05 | 58.51 min
+epoch   4 | train 2.3608/0.2196 | val 2.5179/0.1893 | lr 9.83e-05 | 63.36 min
+epoch   5 | train 2.3013/0.2304 | val 2.5187/0.1892 | lr 9.67e-05 | 66.66 min
+epoch   6 | train 2.2412/0.2440 | val 2.5669/0.1911 | lr 9.45e-05 | 58.47 min
+epoch   7 | train 2.1841/0.2586 | val 2.5859/0.1916 | lr 9.18e-05 | 57.99 min
+epoch   8 | train 2.1251/0.2726 | val 2.5969/0.1898 | lr 8.86e-05 | 59.89 min
+epoch   9 | train 2.0580/0.2891 | val 2.6671/0.1877 | lr 8.50e-05 | 59.31 min
+epoch  10 | train 1.9939/0.3086 | val 2.6941/0.1812 | lr 8.10e-05 | 58.59 min
+epoch  11 | train 1.9266/0.3260 | val 2.7999/0.1803 | lr 7.67e-05 | 61.24 min
+epoch  12 | train 1.8630/0.3433 | val 2.9391/0.1786 | lr 7.20e-05 | 59.07 min
+epoch  13 | train 1.7998/0.3605 | val 2.9606/0.1774 | lr 6.71e-05 | 59.28 min
+epoch  14 | train 1.7361/0.3815 | val 3.0148/0.1779 | lr 6.20e-05 | 59.56 min
+epoch  15 | train 1.6678/0.4014 | val 3.1686/0.1772 | lr 5.68e-05 | 59.36 min
+epoch  16 | train 1.6060/0.4212 | val 3.2540/0.1777 | lr 5.15e-05 | 60.27 min
+epoch  17 | train 1.5469/0.4397 | val 3.3340/0.1746 | lr 4.61e-05 | 59.59 min
+epoch  18 | train 1.4883/0.4586 | val 3.5309/0.1763 | lr 4.08e-05 | 59.76 min
+epoch  19 | train 1.4285/0.4787 | val 3.6050/0.1750 | lr 3.57e-05 | 59.16 min
+epoch  20 | train 1.3679/0.4984 | val 3.7301/0.1750 | lr 3.06e-05 | 59.73 min
+epoch  21 | train 1.3232/0.5136 | val 3.8250/0.1707 | lr 2.58e-05 | 58.76 min
+epoch  22 | train 1.2721/0.5309 | val 3.9149/0.1719 | lr 2.13e-05 | 58.77 min
+epoch  23 | train 1.2359/0.5438 | val 4.0207/0.1728 | lr 1.71e-05 | 60.70 min
+epoch  24 | train 1.1949/0.5584 | val 4.1193/0.1717 | lr 1.33e-05 | 59.10 min
+epoch  25 | train 1.1660/0.5673 | val 4.1849/0.1704 | lr 9.89e-06 | 61.35 min
+epoch  26 | train 1.1381/0.5785 | val 4.2621/0.1705 | lr 6.94e-06 | 59.62 min
+============ Job Information ===================================================
+Submitted: 2026-11-26T11:17:12
+Started: 2026-11-26T11:17:14
+Ended: 2026-11-27T15:31:34
+Elapsed: 1695 min, Limit: 2880 min, Difference: 1185 min
+CPUs: 32, Nodes: 1
+Estimated credit Consumption: 452.00 core-hours
+================================================================================

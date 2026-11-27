@@ -2,12 +2,12 @@
 #
 #SBATCH --job-name=stanford_hydra-vit-3_layers-3_heads-512_mlp_dim-192_embed_dim
 ##SBATCH --qos=7d # SCC: --qos=7d, CIDBN: comment it.
-#SBATCH -t 8:00:00 # SCC: 7-00, CIDBN: 14-00, 48:00:00
+#SBATCH -t 48:00:00 # SCC: 7-00, CIDBN: 14-00, 48:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32 # scc-cpu: max_cpu=96 ; cidbn: max_cpu=128
 #SBATCH -A cidbn_wibral_neuro_human
-#SBATCH -p scc-cpu # cidbn  // scc-cpu
+#SBATCH -p cidbn # cidbn  // scc-cpu
 #SBATCH --output=stanford_hydra-%j.out
 #SBATCH --error=stanford_hydra-%j.err
 
