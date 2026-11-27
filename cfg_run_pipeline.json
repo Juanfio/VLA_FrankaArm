@@ -4,7 +4,7 @@
     ],
     "path_data": "./data",
 
-    "oxe_dataset_name": "stanford_hydra_taco_play_40-episodes",
+    "oxe_dataset_name": "stanford_hydra_taco_play_10-episodes",
     "data_name_sim": "sim_demos.hdf5",
 
     "keys_to_keep": {
